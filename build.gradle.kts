@@ -25,6 +25,7 @@ dependencies {
         bundledPlugin("com.intellij.java")
         pluginVerifier()
         zipSigner()
+        testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
     }
 
     // Embedded Jsonnet evaluator (Apache-2.0), pre-shaded (see :shaded-sjsonnet)
@@ -32,7 +33,9 @@ dependencies {
     implementation(project(":shaded-sjsonnet"))
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.3")
+    testImplementation("junit:junit:4.13.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.11.3")
 }
 
 intellijPlatform {

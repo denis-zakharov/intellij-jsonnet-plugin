@@ -16,11 +16,20 @@
     LOCAL_KW='local'
     IMPORT_KW='import'
     IMPORTSTR_KW='importstr'
+    IMPORTBIN_KW='importbin'
     TRUE_KW='true'
     FALSE_KW='false'
     NULL_KW='null'
     SELF_KW='self'
     SUPER_KW='super'
+    FUNCTION_KW='function'
+    IF_KW='if'
+    THEN_KW='then'
+    ELSE_KW='else'
+    FOR_KW='for'
+    IN_KW='in'
+    ERROR_KW='error'
+    ASSERT_KW='assert'
 
     LBRACE='{'
     RBRACE='}'
@@ -30,10 +39,36 @@
     RPAREN=')'
     COLON=':'
     COLONCOLON='::'
+    COLONCOLONCOLON=':::'
+    PLUSCOLON='+:'
+    PLUSCOLONCOLON='+::'
+    PLUSCOLONCOLONCOLON='+:::'
     SEMI=';'
     COMMA=','
     ASSIGN='='
     DOT='.'
+    DOLLAR='$'
+
+    OROR='||'
+    ANDAND='&&'
+    PIPE='|'
+    CARET='^'
+    AMP='&'
+    EQEQ='=='
+    NEQ='!='
+    LTE='<='
+    GTE='>='
+    SHL='<<'
+    SHR='>>'
+    LT='<'
+    GT='>'
+    PLUS='+'
+    MINUS='-'
+    STAR='*'
+    SLASH='/'
+    PERCENT='%'
+    BANG='!'
+    TILDE='~'
 
     STRING='string'
     NUMBER='number'
@@ -42,31 +77,158 @@
   ]
 }
 
-// Phase 0 minimal grammar: object literals, `local`, literals, import/importstr.
-// Grown to the full Jsonnet grammar in Phase 1.
 jsonnetFile ::= expr?
 
-private expr ::= localExpr | objectLiteral | literal | importExpr
+expr ::= binaryExpr
+
+// Flat, non-recursive precedence chain: every operator on this level is
+// parsed left-to-right into one Expr node. This intentionally does not build
+// a per-precedence nested binary tree (see plan notes) — good enough for
+// syntax highlighting, navigation and refactoring at the statement level;
+// revisit if a future phase needs sub-expression-precise structural editing.
+private binaryExpr ::= unaryExpr (binOp unaryExpr)*
+
+private binOp ::= OROR | ANDAND | PIPE | CARET | AMP | EQEQ | NEQ | LTE | GTE | SHL | SHR | LT | GT
+                 | IN_KW | PLUS | MINUS | STAR | SLASH | PERCENT
+
+private unaryExpr ::= unaryOpExpr | postfixExpr
+
+unaryOpExpr ::= (BANG | MINUS | PLUS | TILDE) unaryExpr {
+  pin=1
+}
+
+private postfixExpr ::= atom postfixSuffix*
+
+private postfixSuffix ::= dotSuffix | indexSuffix | callSuffix
+
+dotSuffix ::= DOT IDENTIFIER {
+  pin=1
+  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetDotSuffixMixin"
+}
+
+// Not `expr | sliceParts`: for "1:3" the `expr` alternative alone would
+// already succeed (matching just "1"), so an ordered choice never backtracks
+// to try the slice-shaped alternative — unify into one rule instead so the
+// (optional) colons are what disambiguate plain index from slice, not choice
+// ordering.
+indexSuffix ::= LBRACK expr? (COLON expr?)? (COLON expr?)? RBRACK {
+  pin=1
+}
+
+callSuffix ::= LPAREN argList? RPAREN {
+  pin=1
+}
+
+argList ::= arg (COMMA arg)* COMMA?
+
+private arg ::= namedArg | expr
+
+namedArg ::= IDENTIFIER ASSIGN expr {
+  pin=2
+}
+
+private atom ::= NUMBER | STRING | TRUE_KW | FALSE_KW | NULL_KW | SELF_KW | SUPER_KW | DOLLAR
+                | objectLiteral | arrayLiteral | parenExpr
+                | localExpr | ifExpr | functionExpr | importExpr | assertExpr | errorExpr
+                | nameRef
+
+nameRef ::= IDENTIFIER {
+  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetNameRefMixin"
+}
+
+parenExpr ::= LPAREN expr RPAREN {
+  pin=1
+}
 
 localExpr ::= LOCAL_KW bind (COMMA bind)* SEMI expr {
   pin=1
 }
 
-bind ::= IDENTIFIER ASSIGN expr
-
-objectLiteral ::= LBRACE objectMember (COMMA objectMember)* COMMA? RBRACE
-                 | LBRACE RBRACE
-
-private objectMember ::= field | localExpr
-
-field ::= fieldName (COLON | COLONCOLON) expr {
-  pin=2
-}
-
-private fieldName ::= IDENTIFIER | STRING
-
-importExpr ::= (IMPORT_KW | IMPORTSTR_KW) STRING {
+bind ::= IDENTIFIER paramList? ASSIGN expr {
   pin=1
 }
 
-literal ::= STRING | NUMBER | TRUE_KW | FALSE_KW | NULL_KW | SELF_KW | SUPER_KW
+paramList ::= LPAREN (param (COMMA param)* COMMA?)? RPAREN {
+  pin=1
+}
+
+param ::= IDENTIFIER (ASSIGN expr)? {
+  pin=1
+}
+
+ifExpr ::= IF_KW expr THEN_KW expr (ELSE_KW expr)? {
+  pin=1
+}
+
+functionExpr ::= FUNCTION_KW paramList expr {
+  pin=1
+}
+
+importExpr ::= (IMPORT_KW | IMPORTSTR_KW | IMPORTBIN_KW) STRING {
+  pin=1
+}
+
+assertExpr ::= ASSERT_KW expr (COLON expr)? SEMI expr {
+  pin=1
+}
+
+errorExpr ::= ERROR_KW expr {
+  pin=1
+}
+
+objectLiteral ::= LBRACE objectBody? RBRACE
+
+private objectBody ::= objectComprehension | objectMemberList
+
+objectMemberList ::= objectMember (COMMA objectMember)* COMMA?
+
+private objectMember ::= field | objectLocal | objectAssert
+
+objectLocal ::= LOCAL_KW bind {
+  pin=1
+}
+
+objectAssert ::= ASSERT_KW expr (COLON expr)? {
+  pin=1
+}
+
+field ::= fieldName paramList? fieldOp expr {
+  pin=3
+}
+
+private fieldName ::= IDENTIFIER | STRING | computedFieldName
+
+computedFieldName ::= LBRACK expr RBRACK {
+  pin=1
+}
+
+private fieldOp ::= COLONCOLONCOLON | COLONCOLON | COLON
+                    | PLUSCOLONCOLONCOLON | PLUSCOLONCOLON | PLUSCOLON
+
+// pin=5 (after forSpec, i.e. once we've seen the mandatory `for`) not pin=2:
+// `computedFieldName COLON expr` alone is also a valid plain field, so
+// committing any earlier breaks backtracking into objectMemberList for the
+// (far more common) non-comprehension case.
+objectComprehension ::= (objectLocal COMMA)* computedFieldName COLON expr forSpec compSpec* {
+  pin=5
+}
+
+arrayLiteral ::= LBRACK arrayBody? RBRACK
+
+private arrayBody ::= arrayComprehension | arrayMemberList
+
+arrayMemberList ::= expr (COMMA expr)* COMMA?
+
+arrayComprehension ::= expr forSpec compSpec* {
+  pin=2
+}
+
+forSpec ::= FOR_KW IDENTIFIER IN_KW expr {
+  pin=1
+}
+
+private compSpec ::= forSpec | ifSpec
+
+ifSpec ::= IF_KW expr {
+  pin=1
+}

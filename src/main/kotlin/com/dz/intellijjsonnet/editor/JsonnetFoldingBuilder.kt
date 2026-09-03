@@ -1,5 +1,6 @@
 package com.dz.intellijjsonnet.editor
 
+import com.dz.intellijjsonnet.lang.psi.JsonnetArrayLiteral
 import com.dz.intellijjsonnet.lang.psi.JsonnetObjectLiteral
 import com.intellij.lang.ASTNode
 import com.intellij.lang.folding.FoldingBuilderEx
@@ -17,10 +18,19 @@ class JsonnetFoldingBuilder : FoldingBuilderEx() {
                 descriptors += FoldingDescriptor(obj.node, obj.textRange)
             }
         }
+        for (arr in PsiTreeUtil.findChildrenOfType(root, JsonnetArrayLiteral::class.java)) {
+            if (arr.textRange.length > 1) {
+                descriptors += FoldingDescriptor(arr.node, arr.textRange)
+            }
+        }
         return descriptors.toTypedArray()
     }
 
-    override fun getPlaceholderText(node: ASTNode): String = "{...}"
+    override fun getPlaceholderText(node: ASTNode): String = when (node.elementType) {
+        com.dz.intellijjsonnet.lang.psi.JsonnetTypes.OBJECT_LITERAL -> "{...}"
+        com.dz.intellijjsonnet.lang.psi.JsonnetTypes.ARRAY_LITERAL -> "[...]"
+        else -> "..."
+    }
 
     override fun isCollapsedByDefault(node: ASTNode): Boolean = false
 }

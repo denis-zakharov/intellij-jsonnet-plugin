@@ -27,6 +27,17 @@ IDENTIFIER=[a-zA-Z_][a-zA-Z0-9_]*
 
 DQ_STRING=\"([^\"\\\r\n]|\\.)*\"
 SQ_STRING='([^'\\\r\n]|\\.)*'
+VERBATIM_DQ_STRING=@\"([^\"]|\"\")*\"
+VERBATIM_SQ_STRING=@'([^']|'')*'
+
+// The "up to" (~) operator matches the shortest string starting with the
+// prefix that has the suffix as its ending — exactly the "read until this
+// terminator" semantics a text block needs (same trick JFlex's own examples
+// use for `/* ... */` comments). Requiring the suffix to start with a newline
+// is what pins the closing `|||` to the start of a line, per the Jsonnet spec,
+// without it having to be alone on that line (trailing content like `,` is
+// left for normal tokenizing, exactly as `|||,` shows up in real Jsonnet).
+TEXT_BLOCK="|||"[ \t]*\r?\n ~ (\r?\n[ \t]*"|||")
 
 %%
 
@@ -35,14 +46,25 @@ SQ_STRING='([^'\\\r\n]|\\.)*'
   {LINE_COMMENT}      { return COMMENT; }
   {BLOCK_COMMENT}     { return COMMENT; }
 
+  {TEXT_BLOCK}        { return STRING; }
+
   "local"             { return LOCAL_KW; }
   "import"            { return IMPORT_KW; }
   "importstr"         { return IMPORTSTR_KW; }
+  "importbin"         { return IMPORTBIN_KW; }
   "true"              { return TRUE_KW; }
   "false"             { return FALSE_KW; }
   "null"              { return NULL_KW; }
   "self"              { return SELF_KW; }
   "super"             { return SUPER_KW; }
+  "function"          { return FUNCTION_KW; }
+  "if"                { return IF_KW; }
+  "then"              { return THEN_KW; }
+  "else"              { return ELSE_KW; }
+  "for"               { return FOR_KW; }
+  "in"                { return IN_KW; }
+  "error"             { return ERROR_KW; }
+  "assert"            { return ASSERT_KW; }
 
   "{"                 { return LBRACE; }
   "}"                 { return RBRACE; }
@@ -50,17 +72,45 @@ SQ_STRING='([^'\\\r\n]|\\.)*'
   "]"                 { return RBRACK; }
   "("                 { return LPAREN; }
   ")"                 { return RPAREN; }
+  ":::"               { return COLONCOLONCOLON; }
   "::"                { return COLONCOLON; }
   ":"                 { return COLON; }
+  "+:::"              { return PLUSCOLONCOLONCOLON; }
+  "+::"               { return PLUSCOLONCOLON; }
+  "+:"                { return PLUSCOLON; }
   ";"                 { return SEMI; }
   ","                 { return COMMA; }
   "="                 { return ASSIGN; }
   "."                 { return DOT; }
+  "$"                 { return DOLLAR; }
 
-  {NUMBER}            { return NUMBER; }
-  {DQ_STRING}         { return STRING; }
-  {SQ_STRING}         { return STRING; }
-  {IDENTIFIER}        { return IDENTIFIER; }
+  "||"                { return OROR; }
+  "&&"                { return ANDAND; }
+  "=="                { return EQEQ; }
+  "!="                { return NEQ; }
+  "<="                { return LTE; }
+  ">="                { return GTE; }
+  "<<"                { return SHL; }
+  ">>"                { return SHR; }
+  "<"                 { return LT; }
+  ">"                 { return GT; }
+  "|"                 { return PIPE; }
+  "^"                 { return CARET; }
+  "&"                 { return AMP; }
+  "+"                 { return PLUS; }
+  "-"                 { return MINUS; }
+  "*"                 { return STAR; }
+  "/"                 { return SLASH; }
+  "%"                 { return PERCENT; }
+  "!"                 { return BANG; }
+  "~"                 { return TILDE; }
+
+  {NUMBER}                { return NUMBER; }
+  {DQ_STRING}             { return STRING; }
+  {SQ_STRING}             { return STRING; }
+  {VERBATIM_DQ_STRING}    { return STRING; }
+  {VERBATIM_SQ_STRING}    { return STRING; }
+  {IDENTIFIER}            { return IDENTIFIER; }
 
   [^]                 { return BAD_CHARACTER; }
 }

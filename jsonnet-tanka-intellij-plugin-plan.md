@@ -289,18 +289,49 @@ a tracked checklist.
   IntelliJ's own bundled classes (scala/sjsonnet/fastparse/ujson/upickle/geny/
   pprint/mainargs/scalatags/org.yaml.snakeyaml), not `os-lib`.
 
-### Phase 1 — MVP parity with the databricks plugin, but native
-- [ ] Extend the `.bnf` to full Jsonnet grammar (functions, comprehensions,
+### Phase 1 — MVP parity with the databricks plugin, but native — ✅ done
+- [x] Extend the `.bnf` to full Jsonnet grammar (functions, comprehensions,
       `super`/`self`/`$`, object composition operators, text blocks, computed
       keys, all operators/precedence per the Jsonnet spec).
-- [ ] `PsiReference` for import paths → resolves relative imports and, where
+- [x] `PsiReference` for import paths → resolves relative imports and, where
       applicable, `-J`-style jpath entries.
-- [ ] `PsiReference` for `local` bindings and simple field references within a
+- [x] `PsiReference` for `local` bindings and simple field references within a
       file.
-- [ ] Structure view, commenter, code folding for all block types, block
+- [x] Structure view, commenter, code folding for all block types, block
       selection.
 - **Exit criterion:** feature-for-feature parity with `databricks/intellij-jsonnet`,
   implemented natively.
+  **Status:** grammar covers the full surface syntax (functions, all
+  comprehension forms, `super`/`self`/`$`, all object-composition field
+  operators `:`/`::`/`:::`/`+:`/`+::`/`+:::`, verbatim strings, text blocks,
+  computed keys, slices). Binary operators intentionally parse into one flat
+  `Expr` per precedence chain rather than a nested per-precedence tree (see
+  bnf comment) — correct for accepting valid syntax, structure view and
+  refactoring, but not yet shaped for sub-expression-precise structural edits;
+  revisit if a later phase needs that. `local`/param/comprehension-var
+  references resolve via `JsonnetResolver` (lexical-scope walk); `self.foo`/
+  `$.foo` resolve to a directly-declared field in the immediately-relevant
+  object literal — chained access (`self.a.b`), `super.foo`, and fields
+  reached through `+`-composition or imports are explicitly out of scope for
+  this phase (need type-directed lookup, which is a Phase 2+/eval-tier
+  concern). Import/importstr/importbin path strings resolve via a
+  `FileReferenceSet`; jpath/vendor-aware resolution is Phase 3's job.
+  Added a real parser/PSI test (`JsonnetParsingTest`, using IntelliJ's
+  lightweight `ParsingTestCase` — no full sandbox needed) alongside a
+  lexer-only test; between them they caught and fixed three real grammar bugs
+  before this ever reached a live IDE: (1) `objectComprehension`'s `pin=2`
+  committed right after `computedFieldName`, before checking for the `for`
+  that actually distinguishes a comprehension from a plain computed field,
+  breaking backtracking into `objectMemberList`; (2) `indexSuffix`'s
+  `sliceContent ::= expr | sliceParts` ordered choice let the `expr`
+  alternative win early on `nums[1:3]` (matching just `1`), never trying the
+  slice-shaped alternative — unified into one rule instead; (3) text blocks
+  used a hand-rolled lexer state where the closing `\|\|\|` lost the
+  maximal-munch race against a generic "consume the line" rule whenever
+  trailing content (e.g. `\|\|\|,`) followed it on the same line — replaced
+  with JFlex's `~` "match up to" operator (the same tool used for `/* */`
+  comments), which sidesteps the length-competition problem entirely.
+  BasePlatformTestCase-level tests, per the plan, stay Phase 4's job.
 
 ### Phase 2 — Parity+ with the grafana-LSP experience
 - [ ] `JsonnetEngine` project service wrapping embedded `sjsonnet` in

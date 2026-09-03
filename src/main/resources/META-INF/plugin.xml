@@ -45,6 +45,14 @@
         <lang.foldingBuilder
             language="Jsonnet"
             implementationClass="com.dz.intellijjsonnet.editor.JsonnetFoldingBuilder"/>
+
+        <psi.referenceContributor
+            language="Jsonnet"
+            implementation="com.dz.intellijjsonnet.lang.psi.reference.JsonnetImportReferenceContributor"/>
+
+        <lang.psiStructureViewFactory
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.editor.structure.JsonnetStructureViewFactory"/>
     </extensions>
 
     <actions>

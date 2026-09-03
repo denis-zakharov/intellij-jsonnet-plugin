@@ -39,9 +39,21 @@ class JsonnetSyntaxHighlighter : SyntaxHighlighterBase() {
         private val EMPTY_KEYS = emptyArray<TextAttributesKey>()
 
         private val KEYWORDS = setOf(
-            JsonnetTypes.LOCAL_KW, JsonnetTypes.IMPORT_KW, JsonnetTypes.IMPORTSTR_KW,
+            JsonnetTypes.LOCAL_KW, JsonnetTypes.IMPORT_KW, JsonnetTypes.IMPORTSTR_KW, JsonnetTypes.IMPORTBIN_KW,
             JsonnetTypes.TRUE_KW, JsonnetTypes.FALSE_KW, JsonnetTypes.NULL_KW,
-            JsonnetTypes.SELF_KW, JsonnetTypes.SUPER_KW,
+            JsonnetTypes.SELF_KW, JsonnetTypes.SUPER_KW, JsonnetTypes.FUNCTION_KW,
+            JsonnetTypes.IF_KW, JsonnetTypes.THEN_KW, JsonnetTypes.ELSE_KW,
+            JsonnetTypes.FOR_KW, JsonnetTypes.IN_KW, JsonnetTypes.ERROR_KW, JsonnetTypes.ASSERT_KW,
+        )
+
+        private val OPERATORS = setOf(
+            JsonnetTypes.ASSIGN, JsonnetTypes.COLON, JsonnetTypes.COLONCOLON, JsonnetTypes.COLONCOLONCOLON,
+            JsonnetTypes.PLUSCOLON, JsonnetTypes.PLUSCOLONCOLON, JsonnetTypes.PLUSCOLONCOLONCOLON,
+            JsonnetTypes.DOT, JsonnetTypes.DOLLAR,
+            JsonnetTypes.OROR, JsonnetTypes.ANDAND, JsonnetTypes.PIPE, JsonnetTypes.CARET, JsonnetTypes.AMP,
+            JsonnetTypes.EQEQ, JsonnetTypes.NEQ, JsonnetTypes.LTE, JsonnetTypes.GTE, JsonnetTypes.SHL, JsonnetTypes.SHR,
+            JsonnetTypes.LT, JsonnetTypes.GT, JsonnetTypes.PLUS, JsonnetTypes.MINUS, JsonnetTypes.STAR,
+            JsonnetTypes.SLASH, JsonnetTypes.PERCENT, JsonnetTypes.BANG, JsonnetTypes.TILDE,
         )
     }
 
@@ -56,7 +68,7 @@ class JsonnetSyntaxHighlighter : SyntaxHighlighterBase() {
         tokenType == JsonnetTypes.LBRACE || tokenType == JsonnetTypes.RBRACE -> BRACES_KEYS
         tokenType == JsonnetTypes.LBRACK || tokenType == JsonnetTypes.RBRACK -> BRACKETS_KEYS
         tokenType == JsonnetTypes.LPAREN || tokenType == JsonnetTypes.RPAREN -> PARENS_KEYS
-        tokenType == JsonnetTypes.ASSIGN || tokenType == JsonnetTypes.COLON || tokenType == JsonnetTypes.COLONCOLON -> OPERATOR_KEYS
+        tokenType in OPERATORS -> OPERATOR_KEYS
         tokenType == JsonnetTypes.IDENTIFIER -> IDENTIFIER_KEYS
         tokenType == com.intellij.psi.TokenType.BAD_CHARACTER -> BAD_CHAR_KEYS
         else -> EMPTY_KEYS
