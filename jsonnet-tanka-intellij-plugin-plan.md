@@ -540,18 +540,115 @@ a tracked checklist.
   rename/format write paths still have no automated coverage in this
   environment, only code review, for the `BasePlatformTestCase` reasons above.
 
-### Phase 5 — Stretch ("even more feature-rich")
-- [ ] Semantic highlighting distinguishing locals/params/fields/std calls.
-- [ ] Inlay hints: named-argument hints on function calls; inferred
-      merge-result hints on composed objects.
-- [ ] "Evaluate expression" / lightweight debugger hooks into the `sjsonnet`
-      evaluator (breakpoints on object fields, step-through of lazy thunks).
+### Phase 5 — Stretch ("even more feature-rich") — ⚠️ mostly done (two items rescoped/dropped)
+- [x] Semantic highlighting distinguishing locals/params/fields/std calls.
+- [x] Inlay hints: named-argument hints on function calls; ~~inferred
+      merge-result hints on composed objects~~ (dropped, see below).
+- [x] "Evaluate expression" / ~~lightweight debugger hooks into the `sjsonnet`
+      evaluator (breakpoints on object fields, step-through of lazy
+      thunks)~~ (rescoped, see below).
 - [ ] Import-graph visualization via IntelliJ's diagram framework.
-- [ ] Cross-environment diff: source-level `tk diff`-style comparison between
+- [x] Cross-environment diff: source-level `tk diff`-style comparison between
       two environments' evaluated output without needing a live cluster.
-- [ ] Dead-code detection (unused `local`s/fields) with a remove quick fix.
+- [x] Dead-code detection (unused `local`s/fields) with a remove quick fix.
 - [ ] Optional, off-by-default online completion for `jsonnetfile.json`
       package names/versions.
+- **Exit criterion:** the stretch items that are buildable without either a
+  fragile heavy platform framework or a nonexistent backing service are
+  built and tested; the two that aren't are honestly rescoped rather than
+  half-attempted.
+  **Status:**
+  - **Semantic highlighting** (`editor/JsonnetSemanticHighlightingAnnotator.kt`):
+    an `Annotator` (not `SyntaxHighlighter` — needs Phase 1/2's reference
+    resolution, which is semantic, not lexical) coloring local/comprehension
+    variables, params, `self`/`$`-resolved fields, and `std.foo(...)` calls,
+    at both declaration and usage sites. New `TextAttributesKey`s fall back to
+    the platform's existing local-variable/parameter/instance-field/
+    static-method colors — no dedicated `ColorSettingsPage` (a customization
+    UI is a nicety, not correctness, and the fallbacks already look right in
+    every bundled scheme).
+  - **Named-argument inlay hints** (`editor/JsonnetInlayParameterHintsProvider.kt`,
+    `InlayParameterHintsProvider`): resolves a call's callee through the exact
+    same `JsonnetLocalReference`/`JsonnetFieldReference` machinery used for
+    go-to-definition, so it only fires where go-to-definition would also
+    work. Tested directly (`JsonnetInlayParameterHintsProviderTest`) since
+    `getParameterHints` is pure PSI + reference resolution, no platform
+    service needed.
+    **Dropped: "inferred merge-result hints on composed objects".**
+    Statically inferring the field set of a `Base + Override` merge without
+    evaluating both sides isn't precise the moment either side has a computed
+    field name, an import, or a comprehension — a wrong inferred-fields hint
+    is worse than no hint. The two-tier plan already has a *precise* answer
+    to "what does this evaluate to": the Preview tool window (full eval, no
+    guessing). Not worth a second, approximate answer to the same question.
+  - **"Evaluate expression"** (`editor/EvaluateJsonnetExpressionAction.kt`):
+    evaluates the current editor selection as a standalone expression,
+    prefixed with the file's own leading `local` chain (copied verbatim from
+    source, so nested/chained locals resolve) — a convenience for
+    self-contained sub-expressions, shown via a plain result/error dialog.
+    **Rescoped from "lightweight debugger hooks ... breakpoints on object
+    fields, step-through of lazy thunks".** `sjsonnet`'s public API has no
+    hook for either (same finding AGENTS.md already records for native
+    functions, confirmed via `javap`, not assumed) — building real
+    breakpoint/step support would mean hooking into `sjsonnet` internals via
+    reflection, which is exactly the kind of fragile, unverifiable-in-this-
+    environment approach the plan's own licensing/maintenance stance (§2, §6)
+    argues against. A real debugger integration (`XDebuggerManager`, a
+    breakpoint type, a suspend/step protocol against an interpreter that
+    supports none of that) is a phase of its own, not a Phase 5 line item.
+  - **Cross-environment diff** (`tanka/CompareTankaEnvironmentsAction.kt`,
+    `tanka/TankaEnvironments.kt`): right-click on (or inside) an
+    `environments/<name>/main.jsonnet`, pick another discovered environment,
+    and get IntelliJ's own diff viewer over two `tk show` runs (ground-truth
+    tier, same command the Phase 4 run configuration and gutter icon already
+    shell out to) — reusing the `CapturingProcessHandler` +
+    `Task.Backgroundable` pattern from `JbInstallQuickFixProvider`. No fast-tier
+    substitute attempted — Helm/Kustomize-backed environments can't be
+    faithfully fast-evaluated (§4.2), so a `tk show`-vs-`tk show` diff is the
+    only honest way to do this without a live cluster.
+  - **Dead-code detection** (`inspection/JsonnetUnusedDeclarationInspection.kt`
+    + `JsonnetUnusedDeclarationUtil.kt` + `JsonnetPsiListEditUtil.kt`): a
+    `local` binding is *never* visible outside its declaring scope in Jsonnet
+    — `import` only returns a file's final value, never its bindings — so
+    "unreferenced within scope" is exact for `local`s, not a heuristic.
+    Object **fields are different**: a plain (`:`/`+:`) field *is* the
+    object's exported/serialized output, so "unused" doesn't apply to it —
+    only **hidden** (`::`/`+::`/`:::`) fields, Jsonnet's actual "private
+    helper" convention, are checked. Flagging plain fields would be wrong far
+    more often than it'd be right (most library files' entire value is
+    "fields nothing inside the file itself reads"). Found and fixed a
+    real pre-existing bug while building this: `JsonnetResolver
+    .resolveLocalName`'s object-local branches returned the wrapping
+    `JsonnetObjectLocal` PSI node instead of the actual `JsonnetBind` —
+    meaning go-to-definition/rename/find-usages on an *object-scoped* `local`
+    (as opposed to an expression-level one) landed one node too high. Caught
+    by `JsonnetUnusedDeclarationUtilTest`'s "used by a field value" case
+    failing, not by inspection, matching the `StdLibRegistrySanityTest`
+    lesson from Phase 4: a resolve-based check is worth testing even when it
+    "obviously" works. Detection logic is unit-tested
+    (`JsonnetUnusedDeclarationUtilTest`); the `LocalInspectionTool`/quick-fix
+    wiring itself needs the same `PsiFileFactory`/document-commit service as
+    Phase 4's rename/formatter write paths (see AGENTS.md), so it's reviewed
+    but not automated-tested.
+  **Deferred (not attempted):**
+  - **Import-graph visualization**: `com.intellij.diagram`'s `DiagramProvider`
+    framework is heavy (its own `DiagramDataModel`, node/edge content
+    managers, a whole builder/extras API surface) and its exact shape drifts
+    across IDE versions more than the EPs used elsewhere in this plugin. Every
+    other UI surface added so far (Preview tool window, run config UI, this
+    phase's own diff view/dialogs) is at least plausible to reason about
+    statically from stable, narrow APIs; a diagram provider is not, and this
+    environment still has no way to actually open the IDE and look at one
+    (the same `BasePlatformTestCase`-hangs constraint noted since Phase 2).
+    Shipping it un-previewable felt like the wrong tradeoff. Worth building
+    once there's a session that can actually run the sandbox IDE to check it.
+  - **Online completion for `jsonnetfile.json` package names/versions**: the
+    premise doesn't hold up — `jb` (Tanka's package manager) resolves
+    dependencies by direct git remote URL (`dependencies[].source.git.remote`,
+    per §5), not by name/version lookup against a central index. There's no
+    npm-/Maven-registry equivalent to complete against for a git-addressed
+    dependency; "online completion for package names" isn't a well-defined
+    feature for this ecosystem, not just an unbuilt one.
 
 ---
 

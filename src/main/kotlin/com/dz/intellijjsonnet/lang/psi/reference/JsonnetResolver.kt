@@ -44,11 +44,12 @@ object JsonnetResolver {
                 }
                 is JsonnetObjectComprehension -> {
                     parent.forSpecList.firstOrNull { it.nameIdentifier?.text == name }?.let { return it }
-                    parent.objectLocalList.firstOrNull { it.bind?.nameIdentifier?.text == name }?.let { return it }
+                    parent.objectLocalList.firstOrNull { it.bind?.nameIdentifier?.text == name }?.bind?.let { return it }
                 }
                 is JsonnetObjectLiteral -> {
                     parent.objectMemberList?.objectLocalList
                         ?.firstOrNull { it.bind?.nameIdentifier?.text == name }
+                        ?.bind
                         ?.let { return it }
                 }
                 else -> {}
@@ -70,6 +71,14 @@ object JsonnetResolver {
             else -> null
         }
     }
+
+    /** `::`/`+::`/`:::` — a Jsonnet-idiomatic "private" field that never contributes to the object's rendered JSON. */
+    fun isHiddenField(field: JsonnetField): Boolean = field.node.findChildByType(HIDDEN_FIELD_OPS) != null
+
+    private val HIDDEN_FIELD_OPS = com.intellij.psi.tree.TokenSet.create(
+        JsonnetTypes.COLONCOLON, JsonnetTypes.COLONCOLONCOLON,
+        JsonnetTypes.PLUSCOLONCOLON, JsonnetTypes.PLUSCOLONCOLONCOLON,
+    )
 
     private fun unquote(text: String): String {
         if (text.length >= 2 && (text.startsWith("\"") || text.startsWith("'"))) {

@@ -97,6 +97,22 @@
             language="Jsonnet"
             implementationClass="com.dz.intellijjsonnet.editor.JsonnetUnresolvedReferenceAnnotator"/>
 
+        <annotator
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.editor.JsonnetSemanticHighlightingAnnotator"/>
+
+        <codeInsight.parameterNameHints
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.editor.JsonnetInlayParameterHintsProvider"/>
+
+        <localInspection language="Jsonnet"
+                         shortName="JsonnetUnusedDeclaration"
+                         displayName="Unused local or hidden field"
+                         groupName="Jsonnet"
+                         enabledByDefault="true"
+                         level="WARNING"
+                         implementationClass="com.dz.intellijjsonnet.inspection.JsonnetUnusedDeclarationInspection"/>
+
         <toolWindow id="Jsonnet Preview"
                     anchor="right"
                     icon="/icons/jsonnet.svg"
@@ -121,6 +137,21 @@
         <action id="Jsonnet.NewTankaEnvironment"
                 class="com.dz.intellijjsonnet.tanka.NewTankaEnvironmentAction">
             <add-to-group group-id="NewGroup" anchor="last"/>
+        </action>
+
+        <action id="Jsonnet.CompareTankaEnvironments"
+                class="com.dz.intellijjsonnet.tanka.CompareTankaEnvironmentsAction"
+                text="Compare Tanka Environment With..."
+                description="Run 'tk show' for this environment and another one, and open the result in a diff view">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+
+        <action id="Jsonnet.EvaluateExpression"
+                class="com.dz.intellijjsonnet.editor.EvaluateJsonnetExpressionAction"
+                text="Evaluate Jsonnet Expression"
+                description="Evaluate the selected expression (plus this file's top-level locals) with the embedded sjsonnet interpreter">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
     </actions>
 </idea-plugin>

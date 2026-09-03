@@ -15,10 +15,12 @@ grammar plus the embedded `sjsonnet` (Databricks, Scala 3, Apache-2.0)
 evaluator running in-process — no external language server. Package
 `com.dz.intellijjsonnet`, plugin id `com.dz.intellij-jsonnet-tanka`.
 
-Phases 0–4 are implemented (4 partially — see the plan doc's Phase 4 status
-block for exactly what's deferred: `BasePlatformTestCase`-based coverage for
-the formatter/rename write paths, which hang/NPE in this sandbox — see
-"Testing" below). Phase 5 is stretch and untouched.
+Phases 0–5 are implemented (4 and 5 partially — see the plan doc's Phase 4/5
+status blocks for exactly what's deferred: `BasePlatformTestCase`-based
+coverage for write-path code, which hangs/NPEs in this sandbox (see "Testing"
+below); an import-graph diagram view; and online `jsonnetfile.json`
+completion, which turned out not to be a well-defined feature for this
+ecosystem at all — see the plan doc).
 
 ## Build system
 
@@ -174,6 +176,26 @@ throws a confusing error deep inside an unrelated construct).
    trying to detect the closer as a separate competing alternative in a
    custom lexer state.
 
+## Resolver bugs hit and fixed (lang/psi/reference/JsonnetResolver.kt)
+
+- **`resolveLocalName`'s object-local branches returned the wrong node.**
+  Found while building Phase 5's dead-code inspection, not by inspection of
+  the code itself — a `JsonnetUnusedDeclarationUtilTest` case ("object-scoped
+  local used by a field value") failed because `reference.resolve()` on a
+  bare-identifier usage of an *object-scoped* `local` (`{ local secret = 1,
+  x: secret }`, as opposed to an expression-level `local secret = 1; ...`)
+  returned the wrapping `JsonnetObjectLocal` PSI node (`local secret`) instead
+  of the actual `JsonnetBind` (`secret`) — both the `is JsonnetObjectLiteral`
+  and `is JsonnetObjectComprehension` branches did `.firstOrNull { it.bind
+  ... }?.let { return it }`, returning `it` (the objectLocal) instead of
+  `it.bind`. Present since Phase 1; nothing had ever compared a resolved
+  object-local target against the actual bind node before, so go-to-
+  definition still "worked" (jumped to a plausible-looking line) and nothing
+  threw. **Lesson, matching the `StdLibRegistrySanityTest` one from Phase
+  4:** a `resolve()`-based check is worth a test asserting *which exact node*
+  it returns, not just that navigation "looks right" or doesn't throw — this
+  class of bug is silent by construction.
+
 ## Testing: what works here and what doesn't
 
 - **`ParsingTestCase`** (JUnit 3-style, `com.intellij.testFramework`) is the
@@ -192,13 +214,21 @@ throws a confusing error deep inside an unrelated construct).
   ready to abandon and fall back to code review if it hangs again. Don't
   assume it'll behave differently just because more code has accumulated.
 - Consequence: `VirtualFilePath`/`VirtualFileImporter` (Phase 2),
-  `TankaJpath` (Phase 3), and both write-paths added in Phase 4
+  `TankaJpath` (Phase 3), both write-paths added in Phase 4
   (`setName`/`handleElementRename`, and the native formatter's actual
-  `CodeStyleManager.reformat()` invocation) are all **reviewed but not
-  automated-tested** in this repo. Their *read-side* logic (pure PSI
-  navigation with no service dependency — e.g. `TankaNativeFunctions`
-  receiver detection, `TankaTkModule` access-chain walking,
-  `PsiNameIdentifierOwner.getName()`) is tested where it could be split out.
+  `CodeStyleManager.reformat()` invocation), and Phase 5's
+  `JsonnetUnusedDeclarationInspection`/quick-fix wiring (plus the stub-tree
+  building/deserialization machinery from the Phase 4 stub-index work) are
+  all **reviewed but not automated-tested** in this repo. Their *read-side*
+  logic (pure PSI navigation and reference resolution with no service
+  dependency — e.g. `TankaNativeFunctions` receiver detection, `TankaTkModule`
+  access-chain walking, `PsiNameIdentifierOwner.getName()`,
+  `JsonnetUnusedDeclarationUtil`'s detection logic, `JsonnetStubIndexUtil`'s
+  top-level/vendor logic, the inlay-hints provider's param resolution) is
+  tested wherever it could be split out from the service-dependent wiring
+  around it — that split is the reusable pattern here: keep anything
+  `PsiFileFactory`/`CodeStyleManager`/VFS-shaped as thin as possible, put the
+  actual logic in a plain object next to it, and test that object directly.
 
 ## Sandbox/environment quirks (not project-specific, but bit this session)
 
