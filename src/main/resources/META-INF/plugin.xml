@@ -71,7 +71,9 @@
             language="Jsonnet"
             implementationClass="com.dz.intellijjsonnet.stdlib.StdLibDocumentationProvider"/>
 
-        <formattingService implementation="com.dz.intellijjsonnet.formatter.JsonnetExternalFormattingService"/>
+        <lang.formatter
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.formatter.JsonnetFormattingModelBuilder"/>
 
         <json.jsonSchemaProviderFactory implementation="com.dz.intellijjsonnet.tanka.schema.TankaJsonSchemaProviderFactory"/>
 

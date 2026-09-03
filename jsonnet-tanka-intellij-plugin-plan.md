@@ -433,7 +433,7 @@ a tracked checklist.
   not automated-tested, same VFS/BasePlatformTestCase constraint noted in
   Phase 2.
 
-### Phase 4 — Refactoring, indexing, run configs, release polish — ⚠️ partially done
+### Phase 4 — Refactoring, indexing, run configs, release polish — ⚠️ mostly done (stub index deferred)
 - [ ] Stub-index layer (`IStubElementType`) for top-level `local`s, object
       fields, function defs; exclude `vendor/` from full-content indexing.
 - [x] Find Usages + Rename (locals, fields, and file rename with import-path
@@ -441,7 +441,7 @@ a tracked checklist.
 - [x] Run configurations: `tk show`/`tk diff`/`tk apply`/`tk export`
       (ground-truth tier, console + diff viewer), plus a plain `jsonnet eval`
       config; run-line-markers next to `environments/*/main.jsonnet`.
-- [ ] Native formatter (replacing the Phase 2 shell-out) built on the plugin's
+- [x] Native formatter (replacing the Phase 2 shell-out) built on the plugin's
       own PSI, integrated with Code Style settings.
 - [ ] Testing: `BasePlatformTestCase`-based grammar/PSI tests; consider reusing
       `sjsonnet`'s own Apache-2.0-licensed golden-file test fixtures to
@@ -477,6 +477,22 @@ a tracked checklist.
   internally hidden fields, matching real Jsonnet's `std.jsonnet`) — meaning
   stdlib completion and hover had been silently returning **nothing** since
   Phase 2. Fixed to use `allKeyNames()` (filtering `__`-prefixed internals).
+  A native formatter (`formatter/JsonnetBlock.kt`,
+  `JsonnetFormattingModelBuilder.kt`) now backs Reformat Code directly, built
+  on the plugin's own PSI (`AbstractBlock` + `SpacingBuilder`) — the Phase 2
+  `jsonnetfmt`/`tk fmt` shell-out service (`JsonnetExternalFormattingService`)
+  was deleted rather than kept alongside it, since an `AsyncDocumentFormattingService`
+  registered for the same language would silently take priority over a native
+  `FormattingModelBuilder` whenever the external tool is on PATH, defeating
+  the point of "replacing" it. **v1 scope, stated plainly:** correct
+  indentation for object/array literals and their member/arg/param lists
+  (the highest-visual-impact part of reformatting a JSON-like language) plus
+  baseline spacing around colons/operators/commas — not a full pretty-printer
+  (no line-wrapping decisions, no comment- or text-block-aware reflow, no
+  blank-line normalization). Good enough to replace the external dependency
+  for everyday reformatting; someone wanting byte-exact upstream `jsonnetfmt`
+  output has no in-plugin option anymore now that the shell-out is gone —
+  worth knowing before calling this Marketplace-final.
   **Rescoped / deferred:**
   - **Stub-index layer**: not built. Find Usages/Rename work correctly without
     it via IntelliJ's default full-text-prefiltered reference search; a stub
@@ -484,20 +500,20 @@ a tracked checklist.
     correctness requirement, and this plugin has no evidence yet of needing
     it. Worth revisiting if profiling on a large real Tanka repo shows a need
     — the plan's own `vendor/`-exclusion concern (§6) applies here too.
-  - **Native formatter**: not built; the Phase 2 `jsonnetfmt`/`tk fmt`
-    shell-out stays as-is. A real Jsonnet pretty-printer (operator precedence,
-    line-wrapping, comment/text-block preservation) is a substantial project
-    in its own right and wasn't attempted rather than rushed.
   - **`BasePlatformTestCase` grammar/PSI tests**: attempted once in Phase 2
     (hung indefinitely, killed) and not reattempted. All new logic this phase
     is instead covered at the `ParsingTestCase` level where possible
-    (`PsiNameIdentifierOwner` read side); the *write* side (`setName`/
-    `handleElementRename`) needs a real `PsiFileFactory` service that
-    `ParsingTestCase`'s minimal `MockApplication` doesn't register — reviewed,
-    not automated-tested, same tradeoff noted for VFS code in Phase 2/3.
-  Given the above, this phase is **not** fully at its stated exit criterion
-  (a stub index and a native formatter are real gaps for a Marketplace-grade
-  release) — flagging honestly rather than marking it done.
+    (`PsiNameIdentifierOwner` read side); anything needing a real
+    `PsiFileFactory` or `CodeStyleManager` service — `setName`/
+    `handleElementRename`, and reformatting itself — hits the same wall:
+    `ParsingTestCase`'s minimal `MockApplication` doesn't register either.
+    Confirmed by trying both directly (both threw the expected NPE) rather
+    than assuming. Reviewed, not automated-tested; same tradeoff noted for
+    VFS code in Phase 2/3.
+  Given the above, this phase is **close to but not fully** at its stated
+  exit criterion — a stub index remains a real gap for a very large Tanka
+  repo, and neither the formatter nor the rename/format write paths have
+  automated coverage in this environment.
 
 ### Phase 5 — Stretch ("even more feature-rich")
 - [ ] Semantic highlighting distinguishing locals/params/fields/std calls.
