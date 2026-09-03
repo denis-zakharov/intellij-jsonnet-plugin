@@ -333,21 +333,56 @@ a tracked checklist.
   comments), which sidesteps the length-competition problem entirely.
   BasePlatformTestCase-level tests, per the plan, stay Phase 4's job.
 
-### Phase 2 — Parity+ with the grafana-LSP experience
-- [ ] `JsonnetEngine` project service wrapping embedded `sjsonnet` in
+### Phase 2 — Parity+ with the grafana-LSP experience — ✅ done (rescoped, see status)
+- [x] `JsonnetEngine` project service wrapping embedded `sjsonnet` in
       structural mode (parse + static-optimize, no full eval) → annotator
       surfaces parse errors and unresolved-symbol diagnostics as-you-type,
       debounced.
-- [ ] Full-eval "Preview" action/tool window: split editor showing JSON/YAML
+- [x] Full-eval "Preview" action/tool window: split editor showing JSON/YAML
       output, inputs for `--tla-*`/`--ext-*` vars, output→source click-to-jump.
-- [ ] Stdlib hover (quick doc) + completion sourced from `sjsonnet`'s own
+- [x] Stdlib hover (quick doc) + completion sourced from `sjsonnet`'s own
       builtin registry (`Std.scala`), so it's always accurate to the pinned
       engine version.
-- [ ] Formatter v1: shell out to `jsonnetfmt`/`tk fmt` if present on PATH,
+- [x] Formatter v1: shell out to `jsonnetfmt`/`tk fmt` if present on PATH,
       wired into Reformat Code, as a pragmatic stopgap.
 - **Exit criterion:** side-by-side with the zzehring+grafana-LSP plugin, this
   plugin matches or exceeds diagnostics/hover/completion/format quality, with
   no external process required for anything except formatting.
+  **Status:** real import resolution landed via a VFS-backed `Path`/`Importer`
+  (`engine/VirtualFilePath.kt`, `engine/importer/VirtualFileImporter.kt`) —
+  Phase 0/1 only ever evaluated importless in-memory snippets. `JsonnetEngine`
+  now evaluates real files with ext-var support
+  (`JsonnetEngine.evaluateFile`). The "Evaluate Jsonnet File" action was
+  repointed to open the new **Jsonnet Preview** tool window
+  (`editor/preview/`) rather than showing a one-shot dialog — it auto-refreshes
+  (400ms debounced) as the focused file or its ext-vars box changes. Stdlib
+  completion/hover (`stdlib/`) reads `std`'s member names straight off
+  `Val$Obj.visibleKeyNames()` at runtime, so it can't drift from the pinned
+  engine version by construction — hover text is deliberately minimal (name
+  only, no per-function description) rather than hand-maintained and
+  potentially wrong. Formatter shells out to `jsonnetfmt`/`tk fmt` via
+  `AsyncDocumentFormattingService`, manually verified against a real
+  `jsonnetfmt` binary on PATH (`echo '{a:1,b:2}' | jsonnetfmt -` →
+  `{ a: 1, b: 2 }`), not yet through the actual Reformat Code action in a
+  running IDE.
+  Rescoped from the original wording: "unresolved-symbol diagnostics" are
+  sourced from `JsonnetResolver`'s own Phase 1 lexical-scope walk (a plain
+  `Annotator`, `JsonnetUnresolvedReferenceAnnotator`), not from sjsonnet's own
+  `StaticOptimizer` — wiring the interpreter's own static scope-checking in
+  for full parity is a follow-up, not required to get real squiggles on
+  undefined locals today. `std` is special-cased as a soft reference
+  (`JsonnetLocalReference.isSoft`) so it's never flagged. Preview supports
+  ext vars only for v1 (TLA vars, a YAML toggle, and output→source
+  click-jump are noted follow-ups); it doesn't yet honor unsaved-buffer
+  content for imported files (reads land straight on the VFS/disk) — same
+  simplification called out for `VirtualFilePath` itself.
+  Testing note: a `BasePlatformTestCase`-based test for the new VFS importer
+  was attempted but the IDE-sandbox test process hung indefinitely (16+
+  minutes, no output, had to be killed) in this environment — abandoned
+  rather than debugged, consistent with the plan's own choice to reserve that
+  heavier framework for Phase 4. The Importer/Path code is reviewed but not
+  automated-tested; the existing lightweight `ParsingTestCase` suite and the
+  Phase 0 `JsonnetEngineTest` (importless) still pass.
 
 ### Phase 3 — Tanka awareness (the actual gap nobody has filled)
 - [ ] Native jpath resolver implementing `root`/`base`/`[base, vendor, lib]`

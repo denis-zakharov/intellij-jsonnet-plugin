@@ -53,13 +53,32 @@
         <lang.psiStructureViewFactory
             language="Jsonnet"
             implementationClass="com.dz.intellijjsonnet.editor.structure.JsonnetStructureViewFactory"/>
+
+        <completion.contributor
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.stdlib.StdLibCompletionContributor"/>
+
+        <lang.documentationProvider
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.stdlib.StdLibDocumentationProvider"/>
+
+        <formattingService implementation="com.dz.intellijjsonnet.formatter.JsonnetExternalFormattingService"/>
+
+        <annotator
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.editor.JsonnetUnresolvedReferenceAnnotator"/>
+
+        <toolWindow id="Jsonnet Preview"
+                    anchor="right"
+                    icon="/icons/jsonnet.svg"
+                    factoryClass="com.dz.intellijjsonnet.editor.preview.JsonnetPreviewToolWindowFactory"/>
     </extensions>
 
     <actions>
         <action id="Jsonnet.EvaluateFile"
                 class="com.dz.intellijjsonnet.editor.EvaluateJsonnetFileAction"
-                text="Evaluate Jsonnet File"
-                description="Evaluate the current Jsonnet file with the embedded sjsonnet interpreter">
+                text="Open Jsonnet Preview"
+                description="Open the Jsonnet Preview tool window, evaluated with the embedded sjsonnet interpreter">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>

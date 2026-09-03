@@ -1,18 +1,23 @@
 package com.dz.intellijjsonnet.engine
 
+import com.dz.intellijjsonnet.engine.importer.VirtualFileImporter
+import com.dz.intellijjsonnet.shaded.scala.collection.immutable.`Map$`
+import com.dz.intellijjsonnet.shaded.scala.collection.immutable.Map as ScalaMap
+import com.dz.intellijjsonnet.shaded.scala.util.Left
+import com.dz.intellijjsonnet.shaded.scala.util.Right
 import com.dz.intellijjsonnet.shaded.sjsonnet.DefaultParseCache
 import com.dz.intellijjsonnet.shaded.sjsonnet.Importer
 import com.dz.intellijjsonnet.shaded.sjsonnet.Interpreter
-import com.dz.intellijjsonnet.shaded.scala.collection.immutable.`Map$`
-import com.dz.intellijjsonnet.shaded.scala.util.Left
-import com.dz.intellijjsonnet.shaded.scala.util.Right
+import com.dz.intellijjsonnet.shaded.sjsonnet.Path
 import com.dz.intellijjsonnet.shaded.ujson.Value
 import com.dz.intellijjsonnet.shaded.ujson.`package` as UJson
+import com.intellij.openapi.vfs.VirtualFile
 
 /**
- * Phase 0 spike: embeds the shaded `sjsonnet` interpreter with no external process.
- * No import resolution yet (backed by [Importer.empty]) — the VFS/PSI-backed importer
- * described in the plan (§4.4) lands in Phase 1+.
+ * Embeds the shaded `sjsonnet` interpreter with no external process — the
+ * "fast tier" from the plan's two-tier evaluation strategy (§4.2). Ground
+ * truth (`tk show`/`tk apply`, anything touching Helm/Kustomize) stays a
+ * Phase 3/4 shell-out; this is pure-Jsonnet evaluation only.
  */
 object JsonnetEngine {
 
@@ -21,10 +26,30 @@ object JsonnetEngine {
         data class Failure(val message: String) : Result()
     }
 
+    /** No import resolution — for evaluating a snippet that isn't backed by a real file. */
     fun evaluate(fileName: String, source: String): Result {
-        val emptyMap = `Map$`.`MODULE$`.empty<String, String>()
         val path = InMemoryPath(fileName, source)
-        val importer: Importer = Importer.empty()
+        return evaluateWith(path, source, Importer.empty(), emptyMap(), emptyMap())
+    }
+
+    /** Full evaluation of a real file, with imports resolved against the IDE's VFS. */
+    fun evaluateFile(
+        file: VirtualFile,
+        extVars: Map<String, String> = emptyMap(),
+        tlaVars: Map<String, String> = emptyMap(),
+    ): Result {
+        val path = VirtualFilePath(file)
+        val source = path.readTextOrEmpty()
+        return evaluateWith(path, source, VirtualFileImporter(), extVars, tlaVars)
+    }
+
+    private fun evaluateWith(
+        path: Path,
+        source: String,
+        importer: Importer,
+        extVars: Map<String, String>,
+        tlaVars: Map<String, String>,
+    ): Result {
         val parseCache = DefaultParseCache()
         val settings = Interpreter.`$lessinit$greater$default$6`()
         val storePos = Interpreter.`$lessinit$greater$default$7`()
@@ -33,8 +58,8 @@ object JsonnetEngine {
         val variableResolver = Interpreter.`$lessinit$greater$default$10`()
 
         val interpreter = Interpreter(
-            emptyMap,
-            emptyMap,
+            toScalaMap(extVars),
+            toScalaMap(tlaVars),
             path,
             importer,
             parseCache,
@@ -53,5 +78,14 @@ object JsonnetEngine {
             is Left<*, *> -> Result.Failure(either.value() as String)
             else -> Result.Failure("Unexpected evaluation result: $either")
         }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun toScalaMap(map: Map<String, String>): ScalaMap<String, String> {
+        var result: ScalaMap<String, String> = `Map$`.`MODULE$`.empty()
+        for ((key, value) in map) {
+            result = result.updated(key, value) as ScalaMap<String, String>
+        }
+        return result
     }
 }
