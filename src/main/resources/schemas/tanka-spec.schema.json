@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Tanka Environment spec.json",
+  "type": "object",
+  "required": ["apiVersion", "kind", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "tanka.dev/v1alpha1"
+    },
+    "kind": {
+      "type": "string",
+      "const": "Environment"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "labels": { "type": "object" }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["apiServer", "namespace"],
+      "properties": {
+        "apiServer": {
+          "type": "string",
+          "description": "The Kubernetes API server this environment targets."
+        },
+        "namespace": {
+          "type": "string",
+          "description": "The default namespace to place objects in."
+        },
+        "contextNames": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "kubeconfig context names allowed to apply this environment."
+        },
+        "resourceDefaults": { "type": "object" },
+        "injectLabels": { "type": "boolean" },
+        "expectVersions": {
+          "type": "object",
+          "properties": {
+            "tanka": { "type": "string" },
+            "k8s": { "type": "string" }
+          }
+        },
+        "applyStrategy": {
+          "type": "string",
+          "enum": ["client", "server"]
+        }
+      }
+    }
+  }
+}

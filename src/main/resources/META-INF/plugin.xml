@@ -11,6 +11,7 @@
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>
+    <depends>com.intellij.modules.json</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType
@@ -58,11 +59,27 @@
             language="Jsonnet"
             implementationClass="com.dz.intellijjsonnet.stdlib.StdLibCompletionContributor"/>
 
+        <completion.contributor
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.tanka.TankaNativeFunctionCompletionContributor"/>
+
+        <completion.contributor
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.tanka.TankaTkModuleCompletionContributor"/>
+
         <lang.documentationProvider
             language="Jsonnet"
             implementationClass="com.dz.intellijjsonnet.stdlib.StdLibDocumentationProvider"/>
 
         <formattingService implementation="com.dz.intellijjsonnet.formatter.JsonnetExternalFormattingService"/>
+
+        <json.jsonSchemaProviderFactory implementation="com.dz.intellijjsonnet.tanka.schema.TankaJsonSchemaProviderFactory"/>
+
+        <codeInsight.unresolvedReferenceQuickFixProvider implementation="com.dz.intellijjsonnet.tanka.JbInstallQuickFixProvider"/>
+
+        <notificationGroup id="Jsonnet" displayType="BALLOON"/>
+
+        <iconProvider implementation="com.dz.intellijjsonnet.tanka.TankaFileIconProvider"/>
 
         <annotator
             language="Jsonnet"
@@ -81,6 +98,11 @@
                 description="Open the Jsonnet Preview tool window, evaluated with the embedded sjsonnet interpreter">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+
+        <action id="Jsonnet.NewTankaEnvironment"
+                class="com.dz.intellijjsonnet.tanka.NewTankaEnvironmentAction">
+            <add-to-group group-id="NewGroup" anchor="last"/>
         </action>
     </actions>
 </idea-plugin>

@@ -2,8 +2,13 @@ package com.dz.intellijjsonnet.lang.psi.reference
 
 import com.dz.intellijjsonnet.lang.psi.JsonnetImportExpr
 import com.dz.intellijjsonnet.lang.psi.JsonnetTypes
+import com.dz.intellijjsonnet.tanka.TankaJpath
+import com.dz.intellijjsonnet.tanka.TankaTkModule
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.patterns.PlatformPatterns
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFileSystemItem
+import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiReference
 import com.intellij.psi.PsiReferenceContributor
 import com.intellij.psi.PsiReferenceProvider
@@ -11,7 +16,13 @@ import com.intellij.psi.PsiReferenceRegistrar
 import com.intellij.psi.impl.source.resolve.reference.impl.providers.FileReferenceSet
 import com.intellij.util.ProcessingContext
 
-/** `import`/`importstr`/`importbin` path strings resolve as relative file references. */
+/**
+ * `import`/`importstr`/`importbin` path strings resolve as file references,
+ * first relative to the importing file (default [FileReferenceSet] behavior),
+ * then against Tanka's jpath search roots (see [TankaJpath]) so a `vendor/`
+ * or `lib/` import navigates correctly even from a file that isn't a sibling
+ * of the dependency.
+ */
 class JsonnetImportReferenceContributor : PsiReferenceContributor() {
     override fun registerReferenceProviders(registrar: PsiReferenceRegistrar) {
         registrar.registerReferenceProvider(
@@ -25,8 +36,25 @@ private object ImportPathReferenceProvider : PsiReferenceProvider() {
     override fun getReferencesByElement(element: PsiElement, context: ProcessingContext): Array<PsiReference> {
         val text = element.text
         if (text.length < 2) return PsiReference.EMPTY_ARRAY
+        // `import 'tk'` is Tanka's synthetic environment-metadata module, not a
+        // real file — treating it as a normal (and permanently unresolved) file
+        // reference would just be a persistent false-positive error.
+        if (TankaTkModule.isTkImportPath(text)) return PsiReference.EMPTY_ARRAY
         val path = text.substring(1, text.length - 1)
+        val fileReferenceSet = object : FileReferenceSet(path, element, 1, null, true) {
+            override fun getDefaultContexts(): MutableCollection<PsiFileSystemItem> {
+                val contexts = super.getDefaultContexts()
+                val virtualFile = element.containingFile?.originalFile?.virtualFile ?: return contexts
+                val manager = PsiManager.getInstance(element.project)
+                val jpathDirs = TankaJpath.searchPath(virtualFile).mapNotNull { toPsiDirectory(it, manager) }
+                if (jpathDirs.isEmpty()) return contexts
+                return (contexts + jpathDirs).toMutableList()
+            }
+        }
         @Suppress("UNCHECKED_CAST")
-        return FileReferenceSet(path, element, 1, null, true).allReferences as Array<PsiReference>
+        return fileReferenceSet.allReferences as Array<PsiReference>
     }
+
+    private fun toPsiDirectory(file: VirtualFile, manager: PsiManager): PsiFileSystemItem? =
+        if (file.isDirectory) manager.findDirectory(file) else null
 }

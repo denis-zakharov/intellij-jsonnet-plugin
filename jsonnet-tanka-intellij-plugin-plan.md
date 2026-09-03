@@ -384,22 +384,54 @@ a tracked checklist.
   automated-tested; the existing lightweight `ParsingTestCase` suite and the
   Phase 0 `JsonnetEngineTest` (importless) still pass.
 
-### Phase 3 — Tanka awareness (the actual gap nobody has filled)
-- [ ] Native jpath resolver implementing `root`/`base`/`[base, vendor, lib]`
+### Phase 3 — Tanka awareness (the actual gap nobody has filled) — ✅ done (one item rescoped)
+- [x] Native jpath resolver implementing `root`/`base`/`[base, vendor, lib]`
       exactly as `grafana/tanka`'s `pkg/jpath` does; wire into import
       resolution/completion.
-- [ ] Project-view recognition of Tanka projects/environments (icons,
+- [x] Project-view recognition of Tanka projects/environments (icons,
       "New Tanka Environment" action scaffolding `spec.json` + `main.jsonnet`).
-- [ ] JSON-Schema-backed editing/completion for `spec.json` and
+- [x] JSON-Schema-backed editing/completion for `spec.json` and
       `jsonnetfile.json`.
-- [ ] `import 'tk'` synthetic PSI target + completion for `tk.env.spec.*`.
-- [ ] Native-function registry (`std.native('parseYaml')` etc.) with real JVM
+- [x] `import 'tk'` synthetic PSI target + completion for `tk.env.spec.*`.
+- [x] Native-function registry (`std.native('parseYaml')` etc.) with real JVM
       re-implementations for the fast tier, and hover/completion docs.
-- [ ] "Unresolved `vendor/...` import" quick fix → run `jb install` (ground-truth
+- [x] "Unresolved `vendor/...` import" quick fix → run `jb install` (ground-truth
       tier) and refresh.
 - **Exit criterion:** a real Tanka repo (e.g. a `jsonnet-libs`-based project)
   opens with correct import resolution, `spec.json` editing support, and
   working `import 'tk'` completion — none of which either existing plugin does.
+  **Status:** `tanka/TankaJpath.kt` walks up for `root`/`base` exactly as
+  described and feeds both the evaluation-tier `VirtualFileImporter` and the
+  editor-tier `FileReferenceSet` (via a `getDefaultContexts()` override), so
+  `vendor/`/`lib/` imports resolve and navigate the same way in both places.
+  `spec.json`/`jsonnetfile.json` get real JSON Schemas
+  (`resources/schemas/*.json`) via `json.jsonSchemaProviderFactory`, plus a
+  distinguishing project-view icon (`TankaFileIconProvider`) and a "New Tanka
+  Environment" action scaffolding both files. `import 'tk'` no longer shows a
+  permanent false-positive "unresolved file" error, and
+  `local tk = import 'tk'; tk.env.spec.<caret>`-shaped code completes
+  `env`/`metadata`/`spec`/spec-fields — scoped to that one idiomatic shape
+  (`TankaTkModule.tkAccessChainBefore`), not general type inference. The
+  `jb install` quick fix appears on an unresolved import once a
+  `jsonnetfile.json` root is found and `jb` is on PATH, and shells out via
+  `AsyncDocumentFormattingService`'s same process-running approach.
+  **Rescoped:** "native-function registry ... with real JVM re-implementations
+  for the fast tier" turned out to be infeasible as originally worded — verified
+  via `javap` that neither `Interpreter` nor `Settings` (nor anything else in
+  `sjsonnet`'s public surface) exposes a hook to register additional native
+  functions; `std.native` only ever resolves the small fixed set `sjsonnet`
+  ships itself (base64/regex/gzip/xz). Real evaluation of a Tanka-injected
+  native function is therefore a ground-truth (`tk`) tier concern by
+  necessity, not a fast-tier gap to close. Delivered instead: a curated
+  registry (`TankaNativeFunctions`) driving completion and hover for the
+  function-name string inside `std.native('...')`, with the quick-doc
+  explicitly saying evaluation isn't available in the fast preview.
+  Testing: added PSI-level tests (no VFS needed) for the two trickiest bits
+  of sibling-walking logic — `std.native(...)` receiver detection and the
+  `tk.env.spec` access-chain walk — both pass. `TankaJpath`/
+  `VirtualFileImporter`'s actual filesystem-walking behavior is reviewed but
+  not automated-tested, same VFS/BasePlatformTestCase constraint noted in
+  Phase 2.
 
 ### Phase 4 — Refactoring, indexing, run configs, release polish
 - [ ] Stub-index layer (`IStubElementType`) for top-level `local`s, object

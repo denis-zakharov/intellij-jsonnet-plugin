@@ -7,23 +7,36 @@ import com.dz.intellijjsonnet.shaded.sjsonnet.Importer
 import com.dz.intellijjsonnet.shaded.sjsonnet.Path
 import com.dz.intellijjsonnet.shaded.sjsonnet.ResolvedFile
 import com.dz.intellijjsonnet.shaded.sjsonnet.StaticResolvedFile
+import com.dz.intellijjsonnet.tanka.TankaJpath
 import com.intellij.openapi.vfs.VfsUtilCore
+import com.intellij.openapi.vfs.VirtualFile
 
 /**
  * Resolves `import`/`importstr`/`importbin` against the IDE's VFS instead of
  * raw disk I/O — the custom Importer the plan (§4.4) calls for, so imports see
- * the same project tree the IDE does. Extra search roots (Tanka jpath,
- * jb vendor/) are a Phase 3 concern; this is plain relative-to-current-file
- * resolution only.
+ * the same project tree the IDE does. Tries relative-to-the-importing-file
+ * first, same as vanilla Jsonnet always does, then falls back to Tanka's
+ * jpath search roots (`[base, root/vendor, root/lib]`, see [TankaJpath]) —
+ * `jb install`-managed dependencies live under `vendor/` and are otherwise
+ * unreachable from a file that doesn't sit next to them.
  */
 class VirtualFileImporter : Importer() {
 
     override fun resolve(docBase: Path, importName: String): Option<Path> {
         val base = docBase as? VirtualFilePath ?: return none()
-        val dir = if (base.file.isDirectory) base.file else base.file.parent ?: return none()
-        val target = VfsUtilCore.findRelativeFile(importName, dir) ?: return none()
-        return some(VirtualFilePath(target))
+        val fromDir = if (base.file.isDirectory) base.file else base.file.parent ?: return none()
+
+        resolveRelativeTo(fromDir, importName)?.let { return some(VirtualFilePath(it)) }
+
+        for (searchRoot in TankaJpath.searchPath(base.file)) {
+            resolveRelativeTo(searchRoot, importName)?.let { return some(VirtualFilePath(it)) }
+        }
+
+        return none()
     }
+
+    private fun resolveRelativeTo(dir: VirtualFile, importName: String): VirtualFile? =
+        VfsUtilCore.findRelativeFile(importName, dir)
 
     override fun read(path: Path, binaryData: Boolean): Option<ResolvedFile> {
         val vfp = path as? VirtualFilePath ?: return none()

@@ -106,6 +106,43 @@ class JsonnetParsingTest : ParsingTestCase("", "jsonnet", JsonnetParserDefinitio
         assertEquals("x", (target as com.dz.intellijjsonnet.lang.psi.JsonnetBind).nameIdentifier?.text)
     }
 
+    fun `test std native name argument is detected`() {
+        val file = createPsiFile("test", "std.native('parseYaml')(x)")
+        ensureParsed(file)
+        val strings = PsiTreeUtil.collectElementsOfType(file, com.intellij.psi.PsiElement::class.java)
+            .filter { it.node?.elementType == com.dz.intellijjsonnet.lang.psi.JsonnetTypes.STRING }
+        val stringLiteral = strings.single()
+        assertTrue(com.dz.intellijjsonnet.tanka.TankaNativeFunctions.isNativeNameArgument(stringLiteral))
+    }
+
+    fun `test non-native string argument is not detected`() {
+        val file = createPsiFile("test", "std.foo('parseYaml')")
+        ensureParsed(file)
+        val strings = PsiTreeUtil.collectElementsOfType(file, com.intellij.psi.PsiElement::class.java)
+            .filter { it.node?.elementType == com.dz.intellijjsonnet.lang.psi.JsonnetTypes.STRING }
+        val stringLiteral = strings.single()
+        assertFalse(com.dz.intellijjsonnet.tanka.TankaNativeFunctions.isNativeNameArgument(stringLiteral))
+    }
+
+    fun `test tk access chain is detected`() {
+        val file = createPsiFile("test", "local tk = import 'tk'; tk.env.spec.namespace")
+        ensureParsed(file)
+        val dotSuffixes = PsiTreeUtil.collectElementsOfType(file, com.dz.intellijjsonnet.lang.psi.JsonnetDotSuffix::class.java)
+            .sortedBy { it.textOffset }
+        // .env  .spec  .namespace
+        assertEquals(3, dotSuffixes.size)
+        assertEquals(emptyList<String>(), com.dz.intellijjsonnet.tanka.TankaTkModule.tkAccessChainBefore(dotSuffixes[0]))
+        assertEquals(listOf("env"), com.dz.intellijjsonnet.tanka.TankaTkModule.tkAccessChainBefore(dotSuffixes[1]))
+        assertEquals(listOf("env", "spec"), com.dz.intellijjsonnet.tanka.TankaTkModule.tkAccessChainBefore(dotSuffixes[2]))
+    }
+
+    fun `test non-tk local does not produce a tk access chain`() {
+        val file = createPsiFile("test", "local other = { env: {} }; other.env.spec")
+        ensureParsed(file)
+        val dotSuffixes = PsiTreeUtil.collectElementsOfType(file, com.dz.intellijjsonnet.lang.psi.JsonnetDotSuffix::class.java)
+        assertTrue(dotSuffixes.all { com.dz.intellijjsonnet.tanka.TankaTkModule.tkAccessChainBefore(it) == null })
+    }
+
     fun `test self field reference resolves`() {
         val file = createPsiFile("test", "{ a: 1, b: self.a }")
         ensureParsed(file)
