@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Build and test
+        run: ./gradlew clean buildPlugin test --console=plain
+
+      - name: Std lib registry sanity check
+        run: ./gradlew test --tests "com.dz.intellijjsonnet.stdlib.StdLibRegistrySanityTest" --console=plain
+
+      - name: Upload plugin artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-zip
+          path: build/distributions/*.zip
+
+  plugin-verifier:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Verify plugin against supported IDE builds
+        run: ./gradlew verifyPlugin --console=plain

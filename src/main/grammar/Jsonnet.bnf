@@ -146,6 +146,7 @@ localExpr ::= LOCAL_KW bind (COMMA bind)* SEMI expr {
 
 bind ::= IDENTIFIER paramList? ASSIGN expr {
   pin=1
+  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetBindMixin"
 }
 
 paramList ::= LPAREN (param (COMMA param)* COMMA?)? RPAREN {
@@ -154,6 +155,7 @@ paramList ::= LPAREN (param (COMMA param)* COMMA?)? RPAREN {
 
 param ::= IDENTIFIER (ASSIGN expr)? {
   pin=1
+  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetParamMixin"
 }
 
 ifExpr ::= IF_KW expr THEN_KW expr (ELSE_KW expr)? {
@@ -194,6 +196,7 @@ objectAssert ::= ASSERT_KW expr (COLON expr)? {
 
 field ::= fieldName paramList? fieldOp expr {
   pin=3
+  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetFieldMixin"
 }
 
 private fieldName ::= IDENTIFIER | STRING | computedFieldName
@@ -225,6 +228,7 @@ arrayComprehension ::= expr forSpec compSpec* {
 
 forSpec ::= FOR_KW IDENTIFIER IN_KW expr {
   pin=1
+  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetForSpecMixin"
 }
 
 private compSpec ::= forSpec | ifSpec

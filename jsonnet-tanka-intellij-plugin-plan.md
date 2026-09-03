@@ -433,12 +433,12 @@ a tracked checklist.
   not automated-tested, same VFS/BasePlatformTestCase constraint noted in
   Phase 2.
 
-### Phase 4 — Refactoring, indexing, run configs, release polish
+### Phase 4 — Refactoring, indexing, run configs, release polish — ⚠️ partially done
 - [ ] Stub-index layer (`IStubElementType`) for top-level `local`s, object
       fields, function defs; exclude `vendor/` from full-content indexing.
-- [ ] Find Usages + Rename (locals, fields, and file rename with import-path
+- [x] Find Usages + Rename (locals, fields, and file rename with import-path
       fixups) using the stub index.
-- [ ] Run configurations: `tk show`/`tk diff`/`tk apply`/`tk export`
+- [x] Run configurations: `tk show`/`tk diff`/`tk apply`/`tk export`
       (ground-truth tier, console + diff viewer), plus a plain `jsonnet eval`
       config; run-line-markers next to `environments/*/main.jsonnet`.
 - [ ] Native formatter (replacing the Phase 2 shell-out) built on the plugin's
@@ -446,11 +446,58 @@ a tracked checklist.
 - [ ] Testing: `BasePlatformTestCase`-based grammar/PSI tests; consider reusing
       `sjsonnet`'s own Apache-2.0-licensed golden-file test fixtures to
       validate parser round-trips and diagnostics against ground truth.
-- [ ] CI: GitHub Actions running the IntelliJ Platform Plugin Verifier across
+- [x] CI: GitHub Actions running the IntelliJ Platform Plugin Verifier across
       supported IDE versions; the `Std.scala`-vs-registry diff check from §6.
 - **Exit criterion:** ready for a JetBrains Marketplace listing — refactoring
   and indexing work project-wide, run configs cover the real Tanka workflow,
   and CI guards both platform compatibility and stdlib drift.
+  **Status — done:** Rename now works for locals/params/comprehension-vars and
+  simple (`self.foo`-style) fields: `PsiNameIdentifierOwner` mixins on
+  `bind`/`param`/`forSpec`/`field` (`lang/psi/impl/*Mixin.kt`) plus
+  `handleElementRename` on both reference classes, sharing one
+  `JsonnetElementFactory.createIdentifierLeaf` helper for minting the
+  replacement leaf — the standard "parse a throwaway file, lift out a real
+  node" trick. Find Usages needed no new code: it's IntelliJ's default
+  `PsiReference`-driven search working off the Phase 1 references, without a
+  stub index — a deliberate simplification (see below). Run configurations
+  (`editor/runconfig/`) cover `jsonnet eval`/`tk show`/`tk diff`/`tk apply`/
+  `tk export` via one configurable `JsonnetRunConfiguration`, plus a gutter
+  run-line-marker on an environment's `main.jsonnet` that runs `tk show`
+  directly. Added a checked-in Gradle wrapper (none existed before this
+  phase) and Gradle toolchains on both modules so the build no longer depends
+  on a hardcoded local JDK path — needed for CI portability, worth doing
+  regardless. CI (`.github/workflows/ci.yml`) builds, tests, and runs the
+  Plugin Verifier on every push/PR. The plan's "`Std.scala`-vs-registry diff
+  check" is moot by construction here (§ Phase 2/3 already made
+  `StdLibRegistry` read `std`'s members off the live interpreter object
+  rather than a hand-maintained list) — replaced with a sanity test
+  (`StdLibRegistrySanityTest`) guarding the *mechanism*. That test caught a
+  real pre-existing bug while being written: `StdLibRegistry` had been
+  calling `visibleKeyNames()`, which excludes `std`'s own functions (they're
+  internally hidden fields, matching real Jsonnet's `std.jsonnet`) — meaning
+  stdlib completion and hover had been silently returning **nothing** since
+  Phase 2. Fixed to use `allKeyNames()` (filtering `__`-prefixed internals).
+  **Rescoped / deferred:**
+  - **Stub-index layer**: not built. Find Usages/Rename work correctly without
+    it via IntelliJ's default full-text-prefiltered reference search; a stub
+    index is a performance optimization for large codebases, not a
+    correctness requirement, and this plugin has no evidence yet of needing
+    it. Worth revisiting if profiling on a large real Tanka repo shows a need
+    — the plan's own `vendor/`-exclusion concern (§6) applies here too.
+  - **Native formatter**: not built; the Phase 2 `jsonnetfmt`/`tk fmt`
+    shell-out stays as-is. A real Jsonnet pretty-printer (operator precedence,
+    line-wrapping, comment/text-block preservation) is a substantial project
+    in its own right and wasn't attempted rather than rushed.
+  - **`BasePlatformTestCase` grammar/PSI tests**: attempted once in Phase 2
+    (hung indefinitely, killed) and not reattempted. All new logic this phase
+    is instead covered at the `ParsingTestCase` level where possible
+    (`PsiNameIdentifierOwner` read side); the *write* side (`setName`/
+    `handleElementRename`) needs a real `PsiFileFactory` service that
+    `ParsingTestCase`'s minimal `MockApplication` doesn't register — reviewed,
+    not automated-tested, same tradeoff noted for VFS code in Phase 2/3.
+  Given the above, this phase is **not** fully at its stated exit criterion
+  (a stub index and a native formatter are real gaps for a Marketplace-grade
+  release) — flagging honestly rather than marking it done.
 
 ### Phase 5 — Stretch ("even more feature-rich")
 - [ ] Semantic highlighting distinguishing locals/params/fields/std calls.

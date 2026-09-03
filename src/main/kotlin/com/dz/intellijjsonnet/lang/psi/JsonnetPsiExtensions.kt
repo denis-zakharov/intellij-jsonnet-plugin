@@ -11,6 +11,15 @@ import com.intellij.psi.PsiElement
  * runs). Plain extensions over the generated interfaces sidestep it entirely.
  */
 
+// JsonnetBind/JsonnetParam/JsonnetForSpec/JsonnetField also get a *real*
+// getNameIdentifier() via their PsiNameIdentifierOwner mixins (see
+// lang/psi/impl/), used by the platform's rename machinery, which dispatches
+// on the interface type at runtime. But code elsewhere in this codebase
+// refers to them by their plain generated interface type (JsonnetBind etc.),
+// which doesn't declare that method — these extensions keep `.nameIdentifier`
+// resolvable at those call sites too. Both coexist without conflict: which
+// one applies depends on the static type of the expression, not a clash.
+
 private fun identifierChild(element: PsiElement): PsiElement? =
     element.node.findChildByType(JsonnetTypes.IDENTIFIER)?.psi
 

@@ -1,7 +1,9 @@
 package com.dz.intellijjsonnet.lang.psi.reference
 
+import com.dz.intellijjsonnet.lang.psi.JsonnetElementFactory
 import com.dz.intellijjsonnet.lang.psi.JsonnetNameRef
 import com.dz.intellijjsonnet.lang.psi.nameIdentifier
+import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementResolveResult
 import com.intellij.psi.PsiPolyVariantReferenceBase
 import com.intellij.psi.ResolveResult
@@ -21,6 +23,11 @@ class JsonnetLocalReference(element: JsonnetNameRef) : PsiPolyVariantReferenceBa
     }
 
     override fun isSoft(): Boolean = element.nameIdentifier?.text == "std"
+
+    override fun handleElementRename(newElementName: String): PsiElement {
+        element.nameIdentifier?.replace(JsonnetElementFactory.createIdentifierLeaf(element.project, newElementName))
+        return element
+    }
 
     override fun getVariants(): Array<Any> = emptyArray()
 }

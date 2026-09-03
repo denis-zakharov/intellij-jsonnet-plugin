@@ -143,6 +143,34 @@ class JsonnetParsingTest : ParsingTestCase("", "jsonnet", JsonnetParserDefinitio
         assertTrue(dotSuffixes.all { com.dz.intellijjsonnet.tanka.TankaTkModule.tkAccessChainBefore(it) == null })
     }
 
+    fun `test PsiNameIdentifierOwner read side for bind, param, forSpec, field`() {
+        // The write side (setName/handleElementRename, both go through
+        // PsiFileFactory to mint a replacement identifier leaf) needs a real
+        // PsiFileFactory service that ParsingTestCase's minimal MockApplication
+        // doesn't register — reviewed but not automated-tested here, same
+        // ParsingTestCase-vs-BasePlatformTestCase tradeoff noted in Phase 2/3
+        // (BasePlatformTestCase itself hangs in this environment). This covers
+        // the read side, which needs nothing beyond parsing.
+        val file = createPsiFile(
+            "test",
+            "local x(p) = [p for p in [1]]; { f(p): p, x: x(1) }",
+        )
+        ensureParsed(file)
+
+        val bind = PsiTreeUtil.findChildOfType(file, com.dz.intellijjsonnet.lang.psi.JsonnetBind::class.java)!!
+        assertEquals("x", (bind as com.intellij.psi.PsiNameIdentifierOwner).name)
+
+        val param = PsiTreeUtil.findChildOfType(file, com.dz.intellijjsonnet.lang.psi.JsonnetParam::class.java)!!
+        assertEquals("p", (param as com.intellij.psi.PsiNameIdentifierOwner).name)
+
+        val forSpec = PsiTreeUtil.findChildOfType(file, com.dz.intellijjsonnet.lang.psi.JsonnetForSpec::class.java)!!
+        assertEquals("p", (forSpec as com.intellij.psi.PsiNameIdentifierOwner).name)
+
+        val field = PsiTreeUtil.findChildrenOfType(file, com.dz.intellijjsonnet.lang.psi.JsonnetField::class.java)
+            .first { it.text.startsWith("f(") }
+        assertEquals("f", (field as com.intellij.psi.PsiNameIdentifierOwner).name)
+    }
+
     fun `test self field reference resolves`() {
         val file = createPsiFile("test", "{ a: 1, b: self.a }")
         ensureParsed(file)

@@ -14,6 +14,12 @@ repositories {
     mavenCentral()
 }
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
 val sjsonnetVersion = "0.7.4"
 
 val shaded: Configuration by configurations.creating

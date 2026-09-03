@@ -89,6 +89,12 @@
                     anchor="right"
                     icon="/icons/jsonnet.svg"
                     factoryClass="com.dz.intellijjsonnet.editor.preview.JsonnetPreviewToolWindowFactory"/>
+
+        <configurationType implementation="com.dz.intellijjsonnet.editor.runconfig.JsonnetRunConfigurationType"/>
+
+        <runLineMarkerContributor
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.editor.runconfig.TankaEnvironmentRunLineMarkerProvider"/>
     </extensions>
 
     <actions>

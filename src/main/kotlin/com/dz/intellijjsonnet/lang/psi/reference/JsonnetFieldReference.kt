@@ -1,6 +1,7 @@
 package com.dz.intellijjsonnet.lang.psi.reference
 
 import com.dz.intellijjsonnet.lang.psi.JsonnetDotSuffix
+import com.dz.intellijjsonnet.lang.psi.JsonnetElementFactory
 import com.dz.intellijjsonnet.lang.psi.JsonnetExpr
 import com.dz.intellijjsonnet.lang.psi.JsonnetTypes
 import com.dz.intellijjsonnet.lang.psi.nameIdentifier
@@ -43,6 +44,11 @@ class JsonnetFieldReference(element: JsonnetDotSuffix) : PsiPolyVariantReference
         if (prev == null || prev.parent != exprParent) return null
         val type = prev.node.elementType
         return if (type == JsonnetTypes.SELF_KW || type == JsonnetTypes.DOLLAR) type else null
+    }
+
+    override fun handleElementRename(newElementName: String): PsiElement {
+        element.nameIdentifier?.replace(JsonnetElementFactory.createIdentifierLeaf(element.project, newElementName))
+        return element
     }
 
     override fun getVariants(): Array<Any> = emptyArray()
