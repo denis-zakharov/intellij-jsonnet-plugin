@@ -1,0 +1,72 @@
+{
+  parserClass="com.dz.intellijjsonnet.lang.parser.JsonnetParser"
+
+  extends="com.intellij.extapi.psi.ASTWrapperPsiElement"
+
+  psiClassPrefix="Jsonnet"
+  psiImplClassSuffix="Impl"
+  psiPackage="com.dz.intellijjsonnet.lang.psi"
+  psiImplPackage="com.dz.intellijjsonnet.lang.psi.impl"
+
+  elementTypeHolderClass="com.dz.intellijjsonnet.lang.psi.JsonnetTypes"
+  elementTypeClass="com.dz.intellijjsonnet.lang.psi.JsonnetElementType"
+  tokenTypeClass="com.dz.intellijjsonnet.lang.psi.JsonnetTokenType"
+
+  tokens=[
+    LOCAL_KW='local'
+    IMPORT_KW='import'
+    IMPORTSTR_KW='importstr'
+    TRUE_KW='true'
+    FALSE_KW='false'
+    NULL_KW='null'
+    SELF_KW='self'
+    SUPER_KW='super'
+
+    LBRACE='{'
+    RBRACE='}'
+    LBRACK='['
+    RBRACK=']'
+    LPAREN='('
+    RPAREN=')'
+    COLON=':'
+    COLONCOLON='::'
+    SEMI=';'
+    COMMA=','
+    ASSIGN='='
+    DOT='.'
+
+    STRING='string'
+    NUMBER='number'
+    IDENTIFIER='identifier'
+    COMMENT='comment'
+  ]
+}
+
+// Phase 0 minimal grammar: object literals, `local`, literals, import/importstr.
+// Grown to the full Jsonnet grammar in Phase 1.
+jsonnetFile ::= expr?
+
+private expr ::= localExpr | objectLiteral | literal | importExpr
+
+localExpr ::= LOCAL_KW bind (COMMA bind)* SEMI expr {
+  pin=1
+}
+
+bind ::= IDENTIFIER ASSIGN expr
+
+objectLiteral ::= LBRACE objectMember (COMMA objectMember)* COMMA? RBRACE
+                 | LBRACE RBRACE
+
+private objectMember ::= field | localExpr
+
+field ::= fieldName (COLON | COLONCOLON) expr {
+  pin=2
+}
+
+private fieldName ::= IDENTIFIER | STRING
+
+importExpr ::= (IMPORT_KW | IMPORTSTR_KW) STRING {
+  pin=1
+}
+
+literal ::= STRING | NUMBER | TRUE_KW | FALSE_KW | NULL_KW | SELF_KW | SUPER_KW

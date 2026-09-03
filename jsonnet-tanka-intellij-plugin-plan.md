@@ -259,22 +259,35 @@ jpath, jb vendor paths) rather than raw disk I/O.
 Each phase lists concrete deliverables and an exit criterion so it can double as
 a tracked checklist.
 
-### Phase 0 — Spike & de-risk (aim: a few days)
-- [ ] Scaffold a new plugin from the IntelliJ Platform Plugin Template
+### Phase 0 — Spike & de-risk (aim: a few days) — ✅ done
+- [x] Scaffold a new plugin from the IntelliJ Platform Plugin Template
       (Gradle Kotlin DSL, `org.jetbrains.intellij.platform` Gradle plugin).
-- [ ] Add `com.databricks:sjsonnet_3` as a dependency, shaded via Gradle Shadow;
+- [x] Add `com.databricks:sjsonnet_3` as a dependency, shaded via Gradle Shadow;
       write a smoke test that calls `Interpreter.interpret()` from inside a
       throwaway IntelliJ action and prints the result — confirms no classloader
       conflicts.
-- [ ] Spike the custom `Importer`/loader API surface in `sjsonnet` needed to
+- [x] Spike the custom `Importer`/loader API surface in `sjsonnet` needed to
       back imports with `VirtualFile` instead of disk I/O; write it down.
-- [ ] Author a minimal Grammar-Kit `.bnf` covering only: object literals,
+- [x] Author a minimal Grammar-Kit `.bnf` covering only: object literals,
       `local`, string/number/bool/null literals, `import`/`importstr`. Generate
       lexer+PSI, register a `LanguageFileType` for `.jsonnet`/`.libsonnet`, get
       syntax highlighting + brace matching + folding working end-to-end.
 - **Exit criterion:** opening a `.jsonnet` file shows correct highlighting/
   folding for the minimal grammar subset, and a manual action can evaluate the
   open file via embedded `sjsonnet` and print JSON to a tool window.
+  **Status:** highlighting/braces/folding/commenter wired for the minimal
+  grammar; `JsonnetEngine` (`engine/JsonnetEngine.kt`) embeds the shaded
+  interpreter and is exercised by a `Evaluate Jsonnet File` action (shows a
+  dialog, not yet a tool window — deferred to Phase 2's real Preview pane) and
+  by `JsonnetEngineTest`, which evaluates real Jsonnet source end-to-end.
+  Note: had to drop a planned `relocate("os", ...)` shade — Shadow's relocator
+  rewrites matching *string literals* too, and the bare `os` prefix corrupted
+  unrelated `System.getProperty("os.arch")` lookups in a transitive dep
+  (lz4-java) into garbage keys, which surfaced as a `NullPointerException`
+  from that library's static initializer. Fixed by relocating only the
+  specific third-party package prefixes actually at risk of colliding with
+  IntelliJ's own bundled classes (scala/sjsonnet/fastparse/ujson/upickle/geny/
+  pprint/mainargs/scalatags/org.yaml.snakeyaml), not `os-lib`.
 
 ### Phase 1 — MVP parity with the databricks plugin, but native
 - [ ] Extend the `.bnf` to full Jsonnet grammar (functions, comprehensions,

@@ -1,0 +1,59 @@
+<idea-plugin>
+    <id>com.dz.intellij-jsonnet-tanka</id>
+    <name>Jsonnet + Tanka</name>
+    <vendor email="dizaharov@gmail.com">dz</vendor>
+
+    <description><![CDATA[
+        Native (non-LSP) IntelliJ support for Jsonnet and Tanka, built on a
+        PSI grammar and the embedded, shaded <a href="https://github.com/databricks/sjsonnet">sjsonnet</a>
+        evaluator — no external language server process.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.java</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileType
+            name="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.lang.JsonnetFileType"
+            fieldName="INSTANCE"
+            language="Jsonnet"
+            extensions="jsonnet"/>
+        <fileType
+            name="Libsonnet"
+            implementationClass="com.dz.intellijjsonnet.lang.LibsonnetFileType"
+            fieldName="INSTANCE"
+            language="Jsonnet"
+            extensions="libsonnet"/>
+
+        <lang.parserDefinition
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.lang.JsonnetParserDefinition"/>
+
+        <lang.syntaxHighlighterFactory
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.editor.JsonnetSyntaxHighlighterFactory"/>
+
+        <lang.braceMatcher
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.editor.JsonnetBraceMatcher"/>
+
+        <lang.commenter
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.editor.JsonnetCommenter"/>
+
+        <lang.foldingBuilder
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.editor.JsonnetFoldingBuilder"/>
+    </extensions>
+
+    <actions>
+        <action id="Jsonnet.EvaluateFile"
+                class="com.dz.intellijjsonnet.editor.EvaluateJsonnetFileAction"
+                text="Evaluate Jsonnet File"
+                description="Evaluate the current Jsonnet file with the embedded sjsonnet interpreter">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>
