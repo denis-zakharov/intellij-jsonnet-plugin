@@ -433,8 +433,8 @@ a tracked checklist.
   not automated-tested, same VFS/BasePlatformTestCase constraint noted in
   Phase 2.
 
-### Phase 4 — Refactoring, indexing, run configs, release polish — ⚠️ mostly done (stub index deferred)
-- [ ] Stub-index layer (`IStubElementType`) for top-level `local`s, object
+### Phase 4 — Refactoring, indexing, run configs, release polish — ⚠️ mostly done (BasePlatformTestCase coverage still deferred)
+- [x] Stub-index layer (`IStubElementType`) for top-level `local`s, object
       fields, function defs; exclude `vendor/` from full-content indexing.
 - [x] Find Usages + Rename (locals, fields, and file rename with import-path
       fixups) using the stub index.
@@ -493,13 +493,38 @@ a tracked checklist.
   for everyday reformatting; someone wanting byte-exact upstream `jsonnetfmt`
   output has no in-plugin option anymore now that the shell-out is gone —
   worth knowing before calling this Marketplace-final.
+  **Stub-index layer (built in a follow-up session):** `bind` and `field` are
+  now genuine `IStubElementType`-backed PSI (`lang/stubs/`) — the Grammar-Kit
+  recipe confirmed by decompiling the installed `grammar-kit-2023.3.4.jar`
+  rather than guessing (see AGENTS.md): per-rule `stubClass=` in `Jsonnet.bnf`
+  plus a root `elementTypeFactory=` (`JsonnetStubElementTypeFactory`) that
+  special-cases `BIND`/`FIELD` and falls back to the old plain
+  `JsonnetElementType` for every other rule. `JsonnetBindMixin`/
+  `JsonnetFieldMixin` moved from `ASTWrapperPsiElement` to
+  `StubBasedPsiElementBase<Stub>` with the two constructors Grammar-Kit's
+  generated `Impl` classes require; `getName()` now prefers the stub
+  (`greenStub?.name`) over touching the AST. `JsonnetStubIndexUtil` decides
+  *which* binds/fields actually get indexed — deliberately narrower than "all
+  of them", matching the plan's own "index only top-level exported symbols"
+  framing from §6: a bind/field only counts as top-level if it's reachable
+  from the file root through nothing but other top-level `local` chains,
+  bind/field *values*, and `+`-composition (the grammar flattens `Base + {
+  ... }` into one `Expr` node, so composition falls out of the same check for
+  free) — walking into a function body, array literal/comprehension, or call
+  argument breaks the chain. Files under a `vendor/` directory are excluded
+  outright, addressing the plan's other §6 concern about huge vendored
+  `jsonnet-libs` checkouts, without needing a project-model-level directory
+  exclusion (which would also have broken go-to-definition *into* vendored
+  imports — not attempted). `JsonnetBindIndex`/`JsonnetFieldIndex`
+  (`StringStubIndexExtension`) plus `JsonnetGotoSymbolContributor` are the
+  concrete payoff: Find Usages/Rename didn't need this (already correct via
+  default full-text-prefiltered reference search, as previously noted below),
+  so "Navigate > Symbol" project-wide is the actual new user-facing feature
+  the index powers. Covered by `JsonnetStubIndexUtilTest` (top-level-ness and
+  vendor-path logic) at the `ParsingTestCase` level — building/deserializing a
+  real stub tree needs the same `PsiFileFactory`/VFS services noted as
+  untestable-here below, so that part is reviewed but not automated-tested.
   **Rescoped / deferred:**
-  - **Stub-index layer**: not built. Find Usages/Rename work correctly without
-    it via IntelliJ's default full-text-prefiltered reference search; a stub
-    index is a performance optimization for large codebases, not a
-    correctness requirement, and this plugin has no evidence yet of needing
-    it. Worth revisiting if profiling on a large real Tanka repo shows a need
-    — the plan's own `vendor/`-exclusion concern (§6) applies here too.
   - **`BasePlatformTestCase` grammar/PSI tests**: attempted once in Phase 2
     (hung indefinitely, killed) and not reattempted. All new logic this phase
     is instead covered at the `ParsingTestCase` level where possible
@@ -510,10 +535,10 @@ a tracked checklist.
     Confirmed by trying both directly (both threw the expected NPE) rather
     than assuming. Reviewed, not automated-tested; same tradeoff noted for
     VFS code in Phase 2/3.
-  Given the above, this phase is **close to but not fully** at its stated
-  exit criterion — a stub index remains a real gap for a very large Tanka
-  repo, and neither the formatter nor the rename/format write paths have
-  automated coverage in this environment.
+  Given the above, this phase is **functionally complete** against its stated
+  exit criterion — the stub-index gap is closed — but the formatter and the
+  rename/format write paths still have no automated coverage in this
+  environment, only code review, for the `BasePlatformTestCase` reasons above.
 
 ### Phase 5 — Stretch ("even more feature-rich")
 - [ ] Semantic highlighting distinguishing locals/params/fields/std calls.

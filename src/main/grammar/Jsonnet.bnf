@@ -10,6 +10,7 @@
 
   elementTypeHolderClass="com.dz.intellijjsonnet.lang.psi.JsonnetTypes"
   elementTypeClass="com.dz.intellijjsonnet.lang.psi.JsonnetElementType"
+  elementTypeFactory="com.dz.intellijjsonnet.lang.stubs.JsonnetStubElementTypeFactory.factory"
   tokenTypeClass="com.dz.intellijjsonnet.lang.psi.JsonnetTokenType"
 
   tokens=[
@@ -144,9 +145,15 @@ localExpr ::= LOCAL_KW bind (COMMA bind)* SEMI expr {
   pin=1
 }
 
+// Stub-backed: enables a name-based project-wide index (see lang/stubs/)
+// without forcing every reference to `local`s to fully parse each candidate
+// file's AST — the same "stub tree, not full AST" pattern IntelliJ uses for
+// library sources. See lang/stubs/JsonnetStubIndexUtil.kt for which binds
+// actually get indexed (top-level only; vendor/ excluded).
 bind ::= IDENTIFIER paramList? ASSIGN expr {
   pin=1
   mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetBindMixin"
+  stubClass="com.dz.intellijjsonnet.lang.stubs.JsonnetBindStub"
 }
 
 paramList ::= LPAREN (param (COMMA param)* COMMA?)? RPAREN {
@@ -194,9 +201,11 @@ objectAssert ::= ASSERT_KW expr (COLON expr)? {
   pin=1
 }
 
+// Stub-backed (see the `bind` rule above for why).
 field ::= fieldName paramList? fieldOp expr {
   pin=3
   mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetFieldMixin"
+  stubClass="com.dz.intellijjsonnet.lang.stubs.JsonnetFieldStub"
 }
 
 private fieldName ::= IDENTIFIER | STRING | computedFieldName

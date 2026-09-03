@@ -4,6 +4,7 @@ import com.dz.intellijjsonnet.lang.lexer.JsonnetLexerAdapter
 import com.dz.intellijjsonnet.lang.parser.JsonnetParser
 import com.dz.intellijjsonnet.lang.psi.JsonnetFile
 import com.dz.intellijjsonnet.lang.psi.JsonnetTypes
+import com.dz.intellijjsonnet.lang.stubs.JsonnetFileElementType
 import com.intellij.lang.ASTNode
 import com.intellij.lang.ParserDefinition
 import com.intellij.lang.PsiParser
@@ -18,7 +19,7 @@ import com.intellij.psi.tree.TokenSet
 class JsonnetParserDefinition : ParserDefinition {
 
     companion object {
-        val FILE = IFileElementType(JsonnetLanguage)
+        val FILE = JsonnetFileElementType()
         val COMMENTS = TokenSet.create(JsonnetTypes.COMMENT)
         val STRINGS = TokenSet.create(JsonnetTypes.STRING)
         val WHITESPACE = TokenSet.WHITE_SPACE

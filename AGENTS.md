@@ -16,8 +16,9 @@ evaluator running in-process — no external language server. Package
 `com.dz.intellijjsonnet`, plugin id `com.dz.intellij-jsonnet-tanka`.
 
 Phases 0–4 are implemented (4 partially — see the plan doc's Phase 4 status
-block for exactly what's deferred: a stub-index layer, mainly). Phase 5 is
-stretch and untouched.
+block for exactly what's deferred: `BasePlatformTestCase`-based coverage for
+the formatter/rename write paths, which hang/NPE in this sandbox — see
+"Testing" below). Phase 5 is stretch and untouched.
 
 ## Build system
 
@@ -54,6 +55,39 @@ stretch and untouched.
   the mixin/impl; the extension resolves when code refers to the plain
   generated interface type) — see the comment at the top of
   `JsonnetPsiExtensions.kt`.
+- **Grammar-Kit stub-index recipe** (used for `bind`/`field` in
+  `lang/stubs/`, confirmed by decompiling the installed
+  `~/.gradle/caches/.../grammar-kit-2023.3.4.jar` — `javap -v` on
+  `JavaParserGenerator.class`'s constant pool — rather than guessing, since
+  there's no Grammar-Kit doc site bundled and web access isn't reliably
+  available): add `stubClass="fully.qualified.XStub"` to the rule in the
+  `.bnf` (keep the existing `mixin=` too, if any) and set a **root** (not
+  per-rule) `elementTypeFactory="fully.qualified.Factory.method"` attribute —
+  that factory is consulted for the `IElementType` constant of *every* rule in
+  the generated `Types` interface, not just the stubbed ones, so it must
+  special-case the stubbed rule names and fall back to the plain
+  `elementTypeClass` type for everything else. This flips the generated `Impl`
+  class to *also* get a second constructor `(XStub stub, IStubElementType
+  stubType)` calling `super(stub, stubType)` — note: raw `IStubElementType`,
+  no generics — so any mixin for that rule must extend
+  `StubBasedPsiElementBase<XStub>` with a matching two-constructor shape
+  (`IStubElementType<*, *>` in Kotlin is fine; star-projection erases to the
+  same raw type). The generated PSI interface also automatically starts
+  extending `StubBasedPsiElement<XStub>` — no `implements=` needed. Also swap
+  `ParserDefinition.getFileNodeType()`'s plain `IFileElementType` for a custom
+  `IStubFileElementType` subclass (override `getStubVersion()`/
+  `getExternalId()`; no need to override `getBuilder()` — the default
+  `DefaultStubBuilder` walks the tree and calls `createStub` on anything whose
+  element type is `instanceof IStubElementType`), and register
+  `<stubElementTypeHolder class="...Types"/>` in `plugin.xml` so the class
+  holding the `IElementType` constants gets force-loaded early (otherwise
+  deserializing a persisted stub tree via `getExternalId()` on a cold IDE
+  start could race against those constants never having been touched yet).
+  `StubIndexExtension`s need their own `<stubIndex key="..."
+  implementation="..."/>` entries. This whole recipe compiled and passed on
+  the **first** `./gradlew generateParser` + `compileKotlin` attempt following
+  it — worth trusting once confirmed via decompilation rather than
+  trial-and-error guessing.
 - `verifyPluginStructure` / `verifyPluginProjectConfiguration` are cheap,
   fast sanity checks on `plugin.xml` and project config — run them after
   touching `plugin.xml`. The full `verifyPlugin` (binary Plugin Verifier

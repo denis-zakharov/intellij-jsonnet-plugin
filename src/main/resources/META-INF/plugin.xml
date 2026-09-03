@@ -55,6 +55,16 @@
             language="Jsonnet"
             implementationClass="com.dz.intellijjsonnet.editor.structure.JsonnetStructureViewFactory"/>
 
+        <stubElementTypeHolder class="com.dz.intellijjsonnet.lang.psi.JsonnetTypes"/>
+
+        <stubIndex key="jsonnet.bind.name"
+                   implementation="com.dz.intellijjsonnet.lang.stubs.JsonnetBindIndex"/>
+
+        <stubIndex key="jsonnet.field.name"
+                   implementation="com.dz.intellijjsonnet.lang.stubs.JsonnetFieldIndex"/>
+
+        <gotoSymbolContributor implementation="com.dz.intellijjsonnet.lang.stubs.JsonnetGotoSymbolContributor"/>
+
         <completion.contributor
             language="Jsonnet"
             implementationClass="com.dz.intellijjsonnet.stdlib.StdLibCompletionContributor"/>
