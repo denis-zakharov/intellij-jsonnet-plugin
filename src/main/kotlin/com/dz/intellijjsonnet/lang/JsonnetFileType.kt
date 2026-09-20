@@ -5,7 +5,12 @@ import javax.swing.Icon
 
 sealed class JsonnetFileTypeBase(private val typeName: String, private val extension: String) : LanguageFileType(JsonnetLanguage) {
     override fun getName(): String = typeName
-    override fun getDescription(): String = "Jsonnet file"
+
+    // Both file types share one Language, so LanguageFileType's default display name
+    // ("Jsonnet") would be identical for the two; FileTypeManagerImpl.checkUnique logs a
+    // PluginException for that (and for an identical description) on every IDE start.
+    override fun getDisplayName(): String = typeName
+    override fun getDescription(): String = "$typeName file"
     override fun getDefaultExtension(): String = extension
     override fun getIcon(): Icon = JsonnetIcons.FILE
 }

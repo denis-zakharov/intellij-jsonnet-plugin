@@ -99,8 +99,10 @@ ecosystem at all — see the plan doc).
   holding the `IElementType` constants gets force-loaded early (otherwise
   deserializing a persisted stub tree via `getExternalId()` on a cold IDE
   start could race against those constants never having been touched yet).
-  `StubIndexExtension`s need their own `<stubIndex key="..."
-  implementation="..."/>` entries. This whole recipe compiled and passed on
+  `StubIndexExtension`s need their own `<stubIndex
+  implementation="..."/>` entries — **no `key` attribute** (the key comes from
+  `getKey()`; an extra attribute makes the platform try to deserialize it into
+  the index class and log `No accessors for ...Index` on every start). This whole recipe compiled and passed on
   the **first** `./gradlew generateParser` + `compileKotlin` attempt following
   it — worth trusting once confirmed via decompilation rather than
   trial-and-error guessing.
@@ -251,6 +253,20 @@ ecosystem at all — see the plan doc).
 - `THIRD_PARTY_NOTICES.md` lists licenses copied from the resolved artifacts' POMs;
   regenerate it (`./gradlew :shaded-sjsonnet:dependencies --configuration shaded`,
   then read each POM's `<license>`) whenever the sjsonnet version changes.
+
+## Startup warnings (checked via the test sandbox log)
+
+- Light tests load `plugin.xml` for real, so plugin-registration warnings show up in
+  `.intellijPlatform/sandbox/*/IC-*/log-test/idea.log` without launching `runIde`:
+  truncate it, run `./gradlew cleanTest test`, then
+  `grep -h "WARN\|ERROR" idea.log | sort | uniq -c`. That's how the two fixed below
+  were verified (448 and 33 occurrences → 0).
+- Two `FileType`s sharing one `Language` must override `getDisplayName()` *and*
+  `getDescription()` (`FileTypeManagerImpl.checkUnique`).
+- **Not ours, ignore:** `kotlin.mpp.tests.force.gradle` conflicting registry key
+  (bundled Kotlin plugin vs itself), `No URL bundle (CFBundleURLTypes)`,
+  `Bundled shared index is not found`, empty custom trusted root certificates —
+  all `runIde`/sandbox-environment noise.
 
 ## Grammar bugs hit and fixed (Jsonnet.bnf / Jsonnet.flex)
 
