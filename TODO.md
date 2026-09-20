@@ -160,6 +160,41 @@ the semantic ranges. Tests: page registered via `plugin.xml`, covers every
 semantic key, demo text is valid, evaluates, and every tag is mapped.
 **Not visually verified** (no `runIde` here) — worth one look in a real IDE.
 
+### 10. ~~Close the sjsonnet-vs-go-jsonnet gaps, incl. Tanka's native functions~~ — DONE
+Measured (not assumed) against go-jsonnet v0.22.0's `testdata/` and Tanka v0.39:
+sjsonnet is close to conformant (480/590 identical, 228 fail in both, **none**
+where go succeeds and sjsonnet fails). Full write-up: `docs/sjsonnet-gaps.md`;
+re-run with `scripts/sjsonnet-conformance.py` after any sjsonnet/go-jsonnet bump.
+- **The hook exists:** `StdLibModule(nativeFunctions, additionalStdFunctions)`,
+  passed as `Interpreter`'s `std` argument. The earlier "no registration hook"
+  verdict only looked at `Interpreter`/`Settings` and was wrong.
+- **Delivered** (`engine/extension/`, used by `JsonnetEngine`, `SjsonnetStaticCheck`,
+  `StdLibRegistry`): `std.id`; go's parameter names for 14 std functions
+  (named-arg calls); Tanka's 8 pure natives (`parseJson`, `parseYaml`,
+  `manifestJsonFromJson`, `manifestYamlFromJson`, `escapeStringRegex`,
+  `regexMatch`, `regexSubst`, `sha256`) with outputs pinned to real `tk eval`.
+- **Bugs the ground-truth comparison caught:** `yes`/`on` parsed as booleans
+  (SnakeYAML is YAML 1.1, yaml.v3 isn't), `null` never matching ujson's `Null`
+  object, and a wrong `%g` threshold.
+- **Not verified:** `manifestYamlFromJson` matches yaml.v3 on every case tried,
+  but it is a hand-written emitter; exotic strings (long lines, unusual
+  Unicode/escapes) haven't been compared against `tk`. A generated differential
+  test would settle it.
+- **Still per-feature, not covered here:** `std.native(x=...)` (`native` is
+  appended after the extras merge), `helmTemplate`/`kustomizeBuild` (external
+  binaries; `std.native` is `null` for them in the preview).
+
+### 11. Number-to-string fidelity with go-jsonnet/Tanka
+`std.toString(0.1)` and `"" + 0.1` are `"0.10000000000000001"` in go-jsonnet
+*and Tanka* (17 significant digits), `"0.1"` in sjsonnet — a real divergence for
+anything Jsonnet stringifies (ConfigMap data, labels built by concatenation).
+Top-level numbers are unaffected (`tk` re-serializes them and prints `0.1`).
+Also huge integers: go prints them exactly, sjsonnet rounds. **Can't be fixed
+through the std hook** — concatenation happens in the evaluator, so overriding
+`std.toString` alone would make the two paths disagree (details in
+`docs/sjsonnet-gaps.md`). Options: upstream/patch sjsonnet, or accept and keep
+it documented. Decide before promising "matches `tk`" anywhere.
+
 ---
 
 ## P2 — Stretch items deferred in the plan doc
@@ -206,6 +241,23 @@ written against the code, including an explicit *Limitations* section.
      not been run; README states this.
   4. Signing / `publishPlugin` credentials, and a `<vendor url>` if wanted.
 
+### 12. Flag sjsonnet-only std functions (they fail under `tk`)
+sjsonnet ships `std.regexFullMatch`, `regexPartialMatch`, `regexGlobalReplace`,
+`regexReplace` and `regexQuoteMeta`; go-jsonnet v0.22 has none of them. Code
+using them previews fine, then fails in `tk show` — the opposite of the usual
+gap, and silent. A weak-warning inspection on `std.<those>` (Tanka's own
+`regexMatch`/`regexSubst` natives are the portable equivalents) would close it.
+Re-check the list with `scripts/sjsonnet-conformance.py` first; go-jsonnet may
+have added them since.
+
+### 13. Re-check the "no tracing/debug hook" premise
+The "Explicitly not planned" debugger entry rested on the same shallow public-API
+inspection that wrongly ruled out native functions. `SjsonnetMainBase.mainConfigured`
+takes a `DebugStats` and an `Option[Evaluator]`, and `Interpreter` takes a logger
+and `storePos`; whether any of that is a usable evaluation-tracing hook is
+unchecked. Spend a probe (write the call, don't just read `javap`) before
+treating step-through as impossible.
+
 ---
 
 ## Explicitly not planned (revisit only if the premise changes)
@@ -215,13 +267,11 @@ written against the code, including an explicit *Limitations* section.
   not by name/version against a central registry; there's nothing to
   complete against. Revisit only if Tanka/`jb` ever grows a real package
   index.
-- **Native `std.native(...)` functions with real JVM re-implementations**
-  (Tanka's Go-injected `parseYaml`, `manifestJsonFromJson`, etc.) — confirmed
-  via `javap` that `sjsonnet`'s public API has no registration hook for
-  these. Revisit only if a future `sjsonnet` release adds one; until then
-  these can only ever run through the ground-truth `tk` shell-out tier.
-- **Real breakpoint/step-through debugging into `sjsonnet`** — same
-  no-public-hook finding as above. `EvaluateJsonnetExpressionAction`
+- **`helmTemplate` / `kustomizeBuild` natives on the JVM** — they shell out to
+  external binaries even inside real Tanka, so a JVM version would just be a
+  worse `tk`. (Tanka's *pure* natives are done — item 10.)
+- **Real breakpoint/step-through debugging into `sjsonnet`** — no public hook
+  found, **but see item 13: that check was shallow.** `EvaluateJsonnetExpressionAction`
   (Phase 5) is the honest substitute. Revisit only if `sjsonnet` ever exposes
   an evaluation-tracing API.
 - **Inferred merge-result inlay hints on composed objects** — dropped as
