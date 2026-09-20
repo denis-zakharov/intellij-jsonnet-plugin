@@ -32,6 +32,7 @@ repositories {
 dependencies {
     intellijPlatform {
         create(providers.gradleProperty("platformType"), providers.gradleProperty("platformVersion"))
+        bundledPlugin("com.intellij.modules.json")
         pluginVerifier()
         zipSigner()
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)

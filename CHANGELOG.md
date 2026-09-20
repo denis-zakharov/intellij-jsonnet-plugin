@@ -4,7 +4,7 @@ All notable changes to this plugin. The format follows [Keep a Changelog](https:
 
 ## [0.1.0] - Unreleased
 
-First release.
+First release. Requires IntelliJ Platform 2025.1 (build 251) or newer.
 
 ### Language support
 - Jsonnet (`.jsonnet`) and Libsonnet (`.libsonnet`) file types with a PSI grammar covering the full
@@ -24,7 +24,8 @@ First release.
   (auto-popup on `.`); completion and documentation for `std`, Tanka's native functions and the
   `tk` module.
 - Unresolved-reference errors, cross-checked against sjsonnet's own scope analysis; an "unused local
-  or hidden field" inspection with quick fixes; parameter-name inlay hints.
+  or hidden field" inspection with quick fixes (a hidden field is only reported when nothing in the
+  project could read it, so library API used from other files is left alone; `vendor/` is skipped); parameter-name inlay hints.
 - Formatter, code folding, structure view, brace matching, commenter.
 
 ### Evaluation

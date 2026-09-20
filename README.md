@@ -4,7 +4,7 @@ Native (non-LSP) IntelliJ support for [Jsonnet](https://jsonnet.org) and [Tanka]
 a real PSI grammar plus the [sjsonnet](https://github.com/databricks/sjsonnet) evaluator embedded
 in-process. There is no language-server process to install, start or keep in sync.
 
-Plugin id `com.dz.intellij-jsonnet-tanka`. Requires an IntelliJ Platform IDE, build 242 (2024.2) or
+Plugin id `com.dz.intellij-jsonnet-tanka`. Requires an IntelliJ Platform IDE, build 251 (2025.1) or
 newer. It depends only on the platform and the bundled JSON module — see [Compatibility](#compatibility).
 
 ## Features
@@ -54,7 +54,7 @@ newer. It depends only on the platform and the bundled JSON module — see [Comp
 
 The plugin declares dependencies only on `com.intellij.modules.platform` and `com.intellij.modules.json`,
 so it is not tied to a Java-capable IDE. It has been built and tested against IntelliJ IDEA Community
-2024.2; other IDEs and newer builds have **not** been run through the Plugin Verifier yet
+2025.1; other IDEs and newer builds have **not** been run through the Plugin Verifier yet
 (`./gradlew verifyPlugin`).
 
 ## Building

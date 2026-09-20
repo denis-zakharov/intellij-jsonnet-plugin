@@ -7,6 +7,7 @@ import com.dz.intellijjsonnet.lang.psi.JsonnetLocalExpr
 import com.dz.intellijjsonnet.lang.psi.JsonnetObjectLocal
 import com.dz.intellijjsonnet.lang.psi.nameIdentifier
 import com.dz.intellijjsonnet.lang.psi.reference.JsonnetResolver
+import com.dz.intellijjsonnet.lang.stubs.JsonnetStubIndexUtil
 import com.intellij.codeInspection.LocalInspectionTool
 import com.intellij.codeInspection.LocalQuickFix
 import com.intellij.codeInspection.ProblemDescriptor
@@ -26,23 +27,28 @@ import com.intellij.psi.PsiElementVisitor
  */
 class JsonnetUnusedDeclarationInspection : LocalInspectionTool() {
 
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor =
-        object : PsiElementVisitor() {
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // jb-installed libraries aren't the user's to clean up, and their hidden fields are API by design.
+        val path = holder.file.virtualFile?.path
+        if (path != null && JsonnetStubIndexUtil.isVendoredPath(path)) return PsiElementVisitor.EMPTY_VISITOR
+        return object : PsiElementVisitor() {
             override fun visitElement(element: PsiElement) {
                 when {
                     element is JsonnetBind && JsonnetUnusedDeclarationUtil.isUnused(element) -> {
                         val name = element.nameIdentifier ?: return
                         holder.registerProblem(name, "Local '${name.text}' is never used", RemoveBindFix())
                     }
-                    element is JsonnetField && JsonnetUnusedDeclarationUtil.isUnusedHiddenField(element) -> {
+                    element is JsonnetField && JsonnetUnusedDeclarationUtil.isUnusedHiddenField(element) &&
+                        !JsonnetFieldUsageSearch.isPossiblyUsed(element) -> {
                         val name = element.nameIdentifier
                         val target = name ?: element
                         val label = name?.text ?: JsonnetResolver.fieldNameText(element) ?: return
-                        holder.registerProblem(target, "Hidden field '$label' is never used", RemoveFieldFix())
+                        holder.registerProblem(target, "Hidden field '$label' is never used in this project", RemoveFieldFix())
                     }
                 }
             }
         }
+    }
 }
 
 private class RemoveBindFix : LocalQuickFix {

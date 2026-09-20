@@ -111,6 +111,10 @@
 
         <typedHandler implementation="com.dz.intellijjsonnet.editor.JsonnetDotAutoPopupHandler"/>
 
+        <lang.findUsagesProvider
+            language="Jsonnet"
+            implementationClass="com.dz.intellijjsonnet.editor.JsonnetFindUsagesProvider"/>
+
         <lang.documentationProvider
             language="Jsonnet"
             implementationClass="com.dz.intellijjsonnet.stdlib.StdLibDocumentationProvider"/>

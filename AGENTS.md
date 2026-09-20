@@ -253,10 +253,22 @@ ecosystem at all — see the plan doc).
   never on plain token leaves. Test any new reference with `findReferenceAt` at the caret.**
 - `ResolveCache` isn't available in `ParsingTestCase`'s mock project; `JsonnetFieldReference`
   falls back to uncached resolution when `ResolveCache.getInstance` is null.
-- Known gap, pre-existing: `JsonnetUnusedDeclarationUtil.isUnusedHiddenField` only searches the
-  field's own object, but in Tanka libraries hidden fields (`new():: ...`) are the public API used
-  from other files — expect false positives there. Fixing it means searching usages project-wide
-  (now possible via the cross-file resolution above).
+- **Unused hidden fields are judged project-wide** (`inspection/JsonnetFieldUsageSearch.kt`), not
+  just inside the field's own object — in Tanka libraries `::` fields *are* the API, and the
+  in-object-only check flagged them everywhere. `JsonnetUnusedDeclarationUtil.isUnusedHiddenField`
+  stays the cheap, service-free in-object check; the inspection then asks the word index for same-named
+  tokens. Rule: `x.name` counts unless it positively resolves to a *different* field (unknown receiver
+  ⇒ maybe used); a `'name'` string counts (`o['name']`, `std.objectHasAll`); comments/locals don't;
+  `vendor/` files aren't inspected. The word index needs `JsonnetFindUsagesProvider`'s
+  `WordsScanner` — without a registered provider there is nothing to search (and no Find Usages).
+
+## Platform baseline
+
+- Built against IntelliJ IDEA Community **2025.1** (`platformVersion=2025.1`, `pluginSinceBuild=251`).
+  From 2025.1 the JSON plugin's classes (`com.jetbrains.jsonSchema`) are no longer on the plain
+  platform classpath: `build.gradle.kts` declares `bundledPlugin("com.intellij.modules.json")`
+  (that *is* the plugin's id). Newer platforms bundle a newer Kotlin stdlib/metadata than KGP 2.0.21
+  can read (it tolerates one minor ahead, i.e. 2.1) — expect to bump Kotlin when moving to 2025.2+.
 
 ## Import graph / marketplace notes (TODO.md items 7, 9)
 
