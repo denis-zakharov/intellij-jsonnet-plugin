@@ -1,5 +1,6 @@
 package com.dz.intellijjsonnet.engine
 
+import com.dz.intellijjsonnet.engine.extension.SjsonnetExtensions
 import com.dz.intellijjsonnet.shaded.scala.util.Left
 import com.dz.intellijjsonnet.shaded.scala.util.Right
 import com.dz.intellijjsonnet.shaded.sjsonnet.DefaultParseCache
@@ -48,7 +49,7 @@ object SjsonnetStaticCheck {
         val settings = Interpreter.`$lessinit$greater$default$6`()
         val storePos = Interpreter.`$lessinit$greater$default$7`()
         val logger = Interpreter.`$lessinit$greater$default$8`()
-        val std = Interpreter.`$lessinit$greater$default$9`()
+        val std = SjsonnetExtensions.std
         val variableResolver = Interpreter.`$lessinit$greater$default$10`()
 
         val interpreter = Interpreter(

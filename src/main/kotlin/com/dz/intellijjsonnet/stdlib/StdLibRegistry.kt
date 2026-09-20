@@ -1,6 +1,7 @@
 package com.dz.intellijjsonnet.stdlib
 
 import com.dz.intellijjsonnet.engine.InMemoryPath
+import com.dz.intellijjsonnet.engine.extension.SjsonnetExtensions
 import com.dz.intellijjsonnet.lang.psi.JsonnetDotSuffix
 import com.dz.intellijjsonnet.lang.psi.JsonnetExpr
 import com.dz.intellijjsonnet.lang.psi.JsonnetNameRef
@@ -37,7 +38,7 @@ object StdLibRegistry {
             Interpreter.`$lessinit$greater$default$6`(),
             Interpreter.`$lessinit$greater$default$7`(),
             Interpreter.`$lessinit$greater$default$8`(),
-            Interpreter.`$lessinit$greater$default$9`(),
+            SjsonnetExtensions.std,
             Interpreter.`$lessinit$greater$default$10`(),
         )
         val result = interpreter.evaluate("std", path)

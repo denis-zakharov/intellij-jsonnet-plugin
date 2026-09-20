@@ -12,13 +12,12 @@ import com.intellij.psi.util.PsiTreeUtil
 /**
  * `std.native('name')` calls out to a function Tanka's Go runtime injects into
  * its `go-jsonnet` VM (`parseYaml`, `manifestJsonFromJson`, ...) — there's no
- * such thing at the vanilla-Jsonnet level. `sjsonnet` has no hook to register
- * additional native functions (checked: neither `Interpreter` nor `Settings`
- * takes one; its own `std.native` only ever looks up the small fixed set it
- * ships itself), so these can't be given real JVM implementations for the fast
- * tier the way the plan originally envisioned — evaluating a Tanka native call
- * is a ground-truth-tier (`tk`) concern. This registry exists purely for
- * completion/hover on the function-name string, which needs no evaluation.
+ * such thing at the vanilla-Jsonnet level. This registry drives completion and
+ * hover for the function-name string; the fast tier *evaluates* every entry
+ * here with a JVM reimplementation (see `engine/extension/TankaNatives.kt`,
+ * which `TankaNativesTest` keeps in step with this list). `helmTemplate` and
+ * `kustomizeBuild` shell out to external binaries even in real Tanka, so they
+ * are deliberately absent: `std.native` returns `null` for them in the preview.
  */
 object TankaNativeFunctions {
 
@@ -32,6 +31,7 @@ object TankaNativeFunctions {
         Entry("escapeStringRegex", "Escapes a string for safe use inside a regular expression."),
         Entry("regexMatch", "Tests whether a string matches a regular expression."),
         Entry("regexSubst", "Replaces regular-expression matches in a string."),
+        Entry("sha256", "Returns the hex-encoded SHA-256 digest of a string."),
     )
 
     val names: List<String> = entries.map { it.name }

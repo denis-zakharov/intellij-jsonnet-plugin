@@ -1,6 +1,7 @@
 package com.dz.intellijjsonnet.engine
 
 import com.dz.intellijjsonnet.engine.importer.VirtualFileImporter
+import com.dz.intellijjsonnet.engine.extension.SjsonnetExtensions
 import com.dz.intellijjsonnet.shaded.scala.collection.immutable.`Map$`
 import com.dz.intellijjsonnet.shaded.scala.collection.immutable.Map as ScalaMap
 import com.dz.intellijjsonnet.shaded.scala.util.Left
@@ -75,7 +76,7 @@ object JsonnetEngine {
         val settings = Interpreter.`$lessinit$greater$default$6`()
         val storePos = Interpreter.`$lessinit$greater$default$7`()
         val logger = Interpreter.`$lessinit$greater$default$8`()
-        val std = Interpreter.`$lessinit$greater$default$9`()
+        val std = SjsonnetExtensions.std
         val variableResolver = Interpreter.`$lessinit$greater$default$10`()
 
         val interpreter = Interpreter(

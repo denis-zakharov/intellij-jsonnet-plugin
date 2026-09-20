@@ -29,7 +29,10 @@ First release. Requires IntelliJ Platform 2025.1 (build 251) or newer.
 - Formatter, code folding, structure view, brace matching, commenter.
 
 ### Evaluation
-- Embedded sjsonnet evaluator (shaded, no external process).
+- Embedded sjsonnet evaluator (shaded, no external process), extended to match go-jsonnet where it
+  differs: `std.id`, go's parameter names for named-argument calls, and Tanka's native functions
+  (`parseJson`, `parseYaml`, `manifestJsonFromJson`, `manifestYamlFromJson`, `escapeStringRegex`,
+  `regexMatch`, `regexSubst`, `sha256`), checked against real `tk` output.
 - **Jsonnet Preview** tool window: JSON or YAML output, ext vars and top-level arguments
   (`name=string` / `name:=code`), Ctrl/Cmd+click an output line to jump to the source expression that
   produced the value (across imports), evaluation of unsaved editor buffers.
@@ -42,7 +45,10 @@ First release. Requires IntelliJ Platform 2025.1 (build 251) or newer.
   comparison via `tk show`, and a `jb install` quick fix (all optional; they call the user's own binaries).
 
 ### Known limitations
-- Tanka's Go-injected native functions (`parseYaml`, Helm, Kustomize, ...) can't be evaluated by the
-  embedded interpreter — use the `tk` run configurations for those.
+- Helm and Kustomize natives (`helmTemplate`, `kustomizeBuild`) can't be evaluated by the embedded
+  interpreter — use the `tk` run configurations for those.
+- Numbers converted to strings inside Jsonnet (`std.toString(0.1)`, `"" + 0.1`) print in shortest form,
+  where go-jsonnet and Tanka print 17 significant digits (`"0.10000000000000001"`). See
+  `docs/sjsonnet-gaps.md` for this and the other known differences.
 - No step debugger (sjsonnet exposes no tracing hook).
 - Preview evaluates on the UI thread, so a very slow evaluation blocks the editor until it finishes.

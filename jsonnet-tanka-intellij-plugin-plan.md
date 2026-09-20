@@ -425,6 +425,11 @@ a tracked checklist.
   registry (`TankaNativeFunctions`) driving completion and hover for the
   function-name string inside `std.native('...')`, with the quick-doc
   explicitly saying evaluation isn't available in the fast preview.
+  **Correction (later session):** the "infeasible" verdict above was wrong — it
+  only inspected `Interpreter`/`Settings`. `StdLibModule(nativeFunctions,
+  additionalStdFunctions)` is the hook, so the original §4 plan (real JVM
+  re-implementations for the fast tier) is now implemented for Tanka's 8 pure
+  natives; see `engine/extension/` and `docs/sjsonnet-gaps.md`.
   Testing: added PSI-level tests (no VFS needed) for the two trickiest bits
   of sibling-walking logic — `std.native(...)` receiver detection and the
   `tk.env.spec` access-chain walk — both pass. `TankaJpath`/

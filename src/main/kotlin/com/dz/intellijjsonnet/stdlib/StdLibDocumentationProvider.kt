@@ -16,7 +16,7 @@ class StdLibDocumentationProvider : AbstractDocumentationProvider() {
             val name = target.text.trim('\'', '"')
             val description = TankaNativeFunctions.describe(name) ?: return null
             return "<b>std.native('$name')</b><br/>$description" +
-                "<br/><i>Injected by Tanka's Go runtime — not evaluated by the in-editor fast preview.</i>"
+                "<br/><i>Injected by Tanka's Go runtime; the in-editor preview evaluates it with a JVM reimplementation.</i>"
         }
 
         val dotSuffix = target.parent as? JsonnetDotSuffix ?: return null

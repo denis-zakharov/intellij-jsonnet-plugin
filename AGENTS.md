@@ -126,14 +126,27 @@ ecosystem at all — see the plan doc).
   `mainargs`, `scalatags`, `org.yaml.snakeyaml`) — leave generic-sounding
   third-party packages like `os` unrelocated. See the comment in
   `shaded-sjsonnet/build.gradle.kts`.
-- **`sjsonnet` has no native-function registration hook.** Verified via
-  `javap` — neither `Interpreter` nor `Settings` (nor anything else in its
-  public surface) lets you register additional `std.native(...)` functions.
-  Tanka's Go-injected natives (`parseYaml`, `manifestJsonFromJson`, ...) can
-  only ever be evaluated by shelling out to the real `tk`/`jsonnet` binary
-  (ground-truth tier) — there's no way to give them real fast-tier JVM
-  implementations. `tanka/TankaNativeFunctions.kt` only drives
-  completion/hover for the function-name string, and says so in its doc.
+- **The native-function hook is `StdLibModule`, not `Interpreter`.** This
+  file used to say sjsonnet has no way to register `std.native(...)` functions;
+  that was checked against `Interpreter`/`Settings` only. `Interpreter`'s 9th
+  constructor argument is the `std` object, and
+  `sjsonnet.stdlib.StdLibModule(nativeFunctions, additionalStdFunctions).module()`
+  builds one — both maps are `Map[String, Val.Func]`, subclass
+  `Val.Builtin1/2/3` from Kotlin. **Every `Interpreter` the plugin builds must
+  pass `SjsonnetExtensions.std`** (`engine/extension/`) instead of
+  `Interpreter.$lessinit$greater$default$9()`: `JsonnetEngine`,
+  `SjsonnetStaticCheck`, `StdLibRegistry` do. It provides `std.id`, go-jsonnet's
+  parameter names for 14 functions, and Tanka's 8 pure natives
+  (`TankaNatives`); `helmTemplate`/`kustomizeBuild` stay ground-truth-tier.
+  Quirks found the hard way: additional std functions override built-ins, but
+  `native` is appended *after* the merge so it can't be replaced; ujson's
+  `Null` is an object (match `` `Null$`.`MODULE$` ``, `is Null` never matches);
+  `Error.fail` returns Scala's `Nothing$`, not Kotlin's `Nothing`.
+  Ground truth for the natives is `tk eval` in any directory with a
+  `jsonnetfile.json` — `TankaNativesTest` pins its verbatim output, so extend
+  it the same way (run `tk` first, then paste). `docs/sjsonnet-gaps.md` is the
+  full sjsonnet-vs-go-jsonnet comparison (what's closed, what isn't and why);
+  `scripts/sjsonnet-conformance.py` regenerates it after a version bump.
 - **`std`'s own functions are hidden fields.** `Val$Obj.visibleKeyNames()`
   returns *empty* for the default std object — std's own 170-ish functions
   are internally `::`-hidden, matching how real Jsonnet's `std.jsonnet`
