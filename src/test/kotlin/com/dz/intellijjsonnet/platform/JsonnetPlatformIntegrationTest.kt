@@ -1,12 +1,15 @@
 package com.dz.intellijjsonnet.platform
 
 import com.dz.intellijjsonnet.engine.JsonnetEngine
+import com.dz.intellijjsonnet.engine.PathSegment
+import com.dz.intellijjsonnet.engine.VirtualFilePath
 import com.dz.intellijjsonnet.inspection.JsonnetUnusedDeclarationInspection
 import com.dz.intellijjsonnet.lang.psi.JsonnetBind
 import com.dz.intellijjsonnet.lang.psi.JsonnetField
 import com.dz.intellijjsonnet.lang.stubs.JsonnetBindIndex
 import com.dz.intellijjsonnet.lang.stubs.JsonnetFieldIndex
 import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.stubs.StubIndex
@@ -147,7 +150,122 @@ class JsonnetPlatformIntegrationTest : BasePlatformTestCase() {
             "expected a successful evaluation, got: $result",
             result is JsonnetEngine.Result.Success,
         )
-        assertEquals("\"Hello, World!\"", (result as JsonnetEngine.Result.Success).json)
+        assertEquals("\"Hello, World!\"", (result as JsonnetEngine.Result.Success).output)
+    }
+
+    // --- Unsaved editor buffers (TODO.md item 5) + Preview click-jump across files (item 4) ---
+
+    private fun setUnsavedText(file: com.intellij.openapi.vfs.VirtualFile, text: String) {
+        val document = FileDocumentManager.getInstance().getDocument(file)!!
+        WriteCommandAction.runWriteCommandAction(project) { document.setText(text) }
+        assertTrue("edit should still be unsaved", FileDocumentManager.getInstance().isFileModified(file))
+    }
+
+    private fun output(result: JsonnetEngine.Result): String {
+        assertTrue("expected a successful evaluation, got: $result", result is JsonnetEngine.Result.Success)
+        return (result as JsonnetEngine.Result.Success).output
+    }
+
+    fun `test evaluation sees unsaved edits to an imported file`() {
+        val lib = myFixture.addFileToProject("lib.libsonnet", "{ v: 1 }")
+        val main = myFixture.addFileToProject("main.jsonnet", "(import 'lib.libsonnet').v")
+        setUnsavedText(lib.virtualFile, "{ v: 2 }")
+        assertEquals("2", output(JsonnetEngine.evaluateFile(main.virtualFile)))
+    }
+
+    fun `test evaluation sees unsaved edits to the evaluated file itself`() {
+        val main = myFixture.addFileToProject("main.jsonnet", "1")
+        setUnsavedText(main.virtualFile, "40 + 2")
+        assertEquals("42", output(JsonnetEngine.evaluateFile(main.virtualFile)))
+    }
+
+    fun `test locate jumps into an imported file`() {
+        val libText = "{ deep: { leaf: 1 } }"
+        val lib = myFixture.addFileToProject("lib.libsonnet", libText)
+        val main = myFixture.addFileToProject("main.jsonnet", "{ x: (import 'lib.libsonnet').deep }")
+        val result = JsonnetEngine.evaluateFile(main.virtualFile) as JsonnetEngine.Result.Success
+        val location = result.locator!!.locate(listOf(PathSegment.Key("x"), PathSegment.Key("leaf")))!!
+        assertEquals(lib.virtualFile, (location.path as VirtualFilePath).file)
+        assertEquals(libText.indexOf("1"), location.offset)
+    }
+
+    fun `test locate offsets refer to the unsaved buffer text`() {
+        val main = myFixture.addFileToProject("main.jsonnet", "{ a: 1 }")
+        val edited = "{\n  pad: 0,\n  a: 1,\n}"
+        setUnsavedText(main.virtualFile, edited)
+        val result = JsonnetEngine.evaluateFile(main.virtualFile) as JsonnetEngine.Result.Success
+        val location = result.locator!!.locate(listOf(PathSegment.Key("a")))!!
+        assertEquals(edited.indexOf("1"), location.offset)
+    }
+
+    // --- Preview panel wiring (TODO.md item 4): focus -> evaluate -> click-jump ---
+
+    private fun previewPanelFor(fileName: String, text: String): com.dz.intellijjsonnet.editor.preview.JsonnetPreviewPanel {
+        myFixture.configureByText(fileName, text)
+        val panel = com.dz.intellijjsonnet.editor.preview.JsonnetPreviewPanel(project)
+        com.intellij.openapi.util.Disposer.register(testRootDisposable, panel)
+        return panel
+    }
+
+    fun `test preview panel renders the focused file and jumps to the source of a clicked line`() {
+        val text = "{\n  a: 1,\n  b: { c: 'x' },\n}"
+        val panel = previewPanelFor("main.jsonnet", text)
+        val output = panel.outputText
+        assertTrue("panel should show the evaluation, got: $output", output.contains("\"c\": \"x\""))
+
+        val line = output.lines().indexOfFirst { it.contains("\"c\"") }
+        panel.jumpToLine(line)
+        assertEquals(text.indexOf("'x'"), myFixture.editor.caretModel.offset)
+    }
+
+    fun `test preview panel yaml mode renders yaml and still jumps`() {
+        val text = "{\n  a: 1,\n  list: [10, 20],\n}"
+        val panel = previewPanelFor("main.jsonnet", text)
+        panel.yamlEnabled = true
+        panel.refresh()
+        val output = panel.outputText
+        assertTrue("expected YAML, got: $output", output.contains("list:") && output.contains("- 20"))
+
+        panel.jumpToLine(output.lines().indexOfFirst { it.contains("- 20") })
+        assertEquals(text.indexOf("20"), myFixture.editor.caretModel.offset)
+    }
+
+    fun `test preview jump into an imported file does not retarget the preview`() {
+        val lib = myFixture.addFileToProject("lib.libsonnet", "{ leaf: 7 }")
+        val panel = previewPanelFor("main.jsonnet", "{ x: (import 'lib.libsonnet') }")
+        val before = panel.outputText
+
+        panel.jumpToLine(panel.outputText.lines().indexOfFirst { it.contains("leaf") })
+        val editorManager = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
+        assertEquals(lib.virtualFile, editorManager.selectedEditor?.file)
+        assertEquals("{ leaf: 7 }".indexOf("7"), editorManager.selectedTextEditor?.caretModel?.offset)
+        assertEquals("preview must keep showing main.jsonnet's output", before, panel.outputText)
+    }
+
+    // --- ColorSettingsPage (TODO.md item 6) ---
+
+    fun `test color settings page is registered and covers every semantic highlighting key`() {
+        val pages = com.intellij.openapi.options.colors.ColorSettingsPages.getInstance().registeredPages
+        assertTrue("page should be registered via plugin.xml", pages.any { it is com.dz.intellijjsonnet.editor.JsonnetColorSettingsPage })
+
+        val page = com.dz.intellijjsonnet.editor.JsonnetColorSettingsPage()
+        val keys = page.attributeDescriptors.map { it.key }.toSet()
+        val semantic = com.dz.intellijjsonnet.editor.JsonnetSemanticHighlightingAnnotator
+        assertTrue(keys.containsAll(listOf(semantic.LOCAL_VARIABLE, semantic.PARAMETER, semantic.FIELD, semantic.STD_CALL)))
+        assertEquals("every descriptor key appears once", page.attributeDescriptors.size, keys.size)
+    }
+
+    fun `test color settings demo text is valid jsonnet and every tag is mapped`() {
+        val page = com.dz.intellijjsonnet.editor.JsonnetColorSettingsPage()
+        val tagged = page.demoText
+        val usedTags = Regex("</?([a-z]+)>").findAll(tagged).map { it.groupValues[1] }.toSet()
+        assertEquals(page.additionalHighlightingTagToDescriptorMap.keys, usedTags)
+
+        val stripped = Regex("</?[a-z]+>").replace(tagged, "")
+        myFixture.configureByText("demo.jsonnet", stripped)
+        assertEquals("demo text should highlight without errors", emptyList<String>(), errorRanges().map { stripped.substring(it.startOffset, it.endOffset) })
+        val result = JsonnetEngine.evaluate("demo.jsonnet", stripped)
+        assertTrue("demo text should evaluate, got: $result", result is JsonnetEngine.Result.Success)
     }
 
     // --- JsonnetUnresolvedReferenceAnnotator (Phase 2) + SjsonnetStaticCheck cross-check (TODO.md item 3) ---

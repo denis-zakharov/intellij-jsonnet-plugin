@@ -1,6 +1,7 @@
 package com.dz.intellijjsonnet.engine.importer
 
 import com.dz.intellijjsonnet.engine.VirtualFilePath
+import com.dz.intellijjsonnet.engine.VirtualFileText
 import com.dz.intellijjsonnet.shaded.scala.Option
 import com.dz.intellijjsonnet.shaded.scala.`Option$`
 import com.dz.intellijjsonnet.shaded.sjsonnet.Importer
@@ -42,7 +43,7 @@ class VirtualFileImporter : Importer() {
         val vfp = path as? VirtualFilePath ?: return none()
         if (vfp.file.isDirectory) return none()
         val content = try {
-            VfsUtilCore.loadText(vfp.file)
+            VirtualFileText.read(vfp.file)
         } catch (e: Exception) {
             return none()
         }

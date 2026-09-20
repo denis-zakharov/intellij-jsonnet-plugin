@@ -371,11 +371,10 @@ a tracked checklist.
   `StaticOptimizer` — wiring the interpreter's own static scope-checking in
   for full parity is a follow-up, not required to get real squiggles on
   undefined locals today. `std` is special-cased as a soft reference
-  (`JsonnetLocalReference.isSoft`) so it's never flagged. Preview supports
-  ext vars only for v1 (TLA vars, a YAML toggle, and output→source
-  click-jump are noted follow-ups); it doesn't yet honor unsaved-buffer
-  content for imported files (reads land straight on the VFS/disk) — same
-  simplification called out for `VirtualFilePath` itself.
+  (`JsonnetLocalReference.isSoft`) so it's never flagged. Preview
+  originally supported ext vars only and read imports off disk; TLA vars, a YAML
+  toggle, output→source click-jump, and unsaved-buffer reads were added later
+  (TODO.md items 4–5).
   Testing note: a `BasePlatformTestCase`-based test for the new VFS importer
   was attempted but the IDE-sandbox test process hung indefinitely (16+
   minutes, no output, had to be killed) in this environment — abandoned

@@ -121,35 +121,44 @@ pass and returns the first unresolved name's source offset + message, or
 
 ## P1 — Real, scoped feature gaps
 
-### 4. Preview tool window: TLA vars, YAML toggle, output→source click-jump
-`JsonnetPreviewPanel` (Phase 2) only supports `--ext-*` vars. TLA vars
-(`--tla-*`), a YAML output mode, and click-to-jump from output back to the
-source position that produced it were all explicitly scoped out as "not v1"
-and never revisited.
-- **Effort:** moderate. TLA vars is a small UI+engine-call addition
-  (`JsonnetEngine.evaluateFile` would need a `tlaVars` param wired through —
-  check whether `Interpreter`'s constructor already threads a TLA map, since
-  the pattern's very similar to `extVars`). Output→source click-jump is the
-  hard part — it needs the §4.4 "TextRange → sjsonnet Expr" position mapping
-  that's never actually been built for anything.
+### 4. ~~Preview tool window: TLA vars, YAML toggle, output→source click-jump~~ — DONE
+All three landed in `JsonnetPreviewPanel`, each with tests (engine-level unit
+tests plus a `BasePlatformTestCase` that drives the real panel).
+- **TLA vars:** second box next to ext vars; `name=string` / `name:=code`
+  syntax (`PreviewVars`). This also fixed a latent bug in the ext-var box:
+  `sjsonnet`'s Map-based `Interpreter` constructor treats *every* value as
+  `ext-code`, so `env=prod` used to fail as an unresolved variable `prod`.
+  `JsonnetEngine.VarValue(text, isCode)` now string-quotes non-code values.
+- **YAML toggle:** toolbar toggle; `sjsonnet`'s own `YamlRenderer` with
+  `quoteKeys = false` (bare keys, like `tk show`; string *values* stay quoted).
+- **Click-jump:** Ctrl/Cmd+click an output line → `PreviewOutputPaths` maps the
+  line to a value path (own JSON tokenizer; YAML via the shaded snakeyaml node
+  tree's line marks) → `SourceLocator` re-evaluates lazily and walks
+  `Val.Obj`/`Val.Arr` along the path → `Val.pos` → open file at offset,
+  including files reached through imports. **Deliberately the position of the
+  expression that *produced* the value, not the field key:** sjsonnet 0.7.4
+  folds constant objects into `ConstMember(value)` with no key position
+  (probed by reflection), so key positions aren't available consistently.
+  Jumping into an imported file doesn't retarget Preview at it (`jumpTarget`
+  guard, mutation-checked). Not built: the plan's full §4.4 "every PSI
+  `TextRange` → `Expr`" mapping — click-jump didn't need it.
+- Still evaluates on the EDT (pre-existing); a slow evaluation blocks the UI.
 
-### 5. Preview/import resolution should honor unsaved buffers for imported files
-`VirtualFileImporter`/`VirtualFilePath` (Phase 2) read imports straight off
-the VFS/disk — edits to a file other than the one currently focused don't
-show up in Preview until saved. Called out as a known simplification, not
-revisited.
-- **Effort:** moderate — needs `FileDocumentManager.getDocument(file).text`
-  preferred over `VirtualFile.contentsToByteArray()` in the importer's read
-  path.
+### 5. ~~Preview/import resolution should honor unsaved buffers~~ — DONE
+`VirtualFileText.read` (live `Document` if one is loaded, else VFS) is now the
+single read path for the root file, imports, and error-position rendering.
+Preview also listens to *every* Jsonnet document (not just the focused one) so
+editing an imported file refreshes it. Covered by `JsonnetPlatformIntegrationTest`
+(edit imported file → output changes; click-jump offsets refer to buffer text).
+Only files with a loaded `Document` are affected (`getCachedDocument`), which
+is exactly the set that can have unsaved edits.
 
-### 6. `ColorSettingsPage` for the Phase 5 semantic-highlighting keys
-`JsonnetSemanticHighlightingAnnotator`'s four new `TextAttributesKey`s
-(`JSONNET_LOCAL_VARIABLE`/`PARAMETER`/`FIELD`/`STD_CALL`) only have fallback
-colors — there's no Settings > Editor > Color Scheme page entry for a user
-to customize them independently of the fallback.
-- **Effort:** low-moderate — standard `ColorSettingsPage` implementation
-  (demo text + attribute descriptor map), well-trodden IntelliJ-plugin
-  boilerplate.
+### 6. ~~`ColorSettingsPage` for the Phase 5 semantic-highlighting keys~~ — DONE
+`JsonnetColorSettingsPage` (Settings > Editor > Color Scheme > Jsonnet) lists
+the lexer keys and the four semantic keys, with a demo text whose `<tag>`s paint
+the semantic ranges. Tests: page registered via `plugin.xml`, covers every
+semantic key, demo text is valid, evaluates, and every tag is mapped.
+**Not visually verified** (no `runIde` here) — worth one look in a real IDE.
 
 ---
 

@@ -203,6 +203,33 @@ ecosystem at all — see the plan doc).
   file, too expensive to redo per identifier) layered on top only to catch
   cases the hand-rolled walk's own logic might miss.
 
+## Evaluation / Preview gotchas (TODO.md items 4–5)
+
+- **`Interpreter`'s Map-based constructor makes every ext/TLA var `ext-code`**
+  (`ExternalVariable.code`, seen in bytecode). A plain string must be passed as
+  a Jsonnet string literal — `JsonnetEngine.toScalaMap` does it via ujson.
+- **Field *key* positions aren't recoverable from an evaluated `Val.Obj`.**
+  sjsonnet 0.7.4 folds constant-field objects into `ConstMember(v)` (value only,
+  and `{a:1}+{a:2}` merges into one such object); `_sourceMemberList` (real
+  `Expr.Member.Field` positions) is only set for non-constant objects. Only
+  `Val.pos` (where the value was produced) is consistent — `SourceLocator` uses
+  that. Found by a reflection probe (a throwaway `Probe.java` against
+  `shaded-sjsonnet/build/libs/shaded-sjsonnet.jar`; in Java the shaded nested
+  Scala classes only resolve as `Val.Obj`, not `Val$Obj$Member`); worth
+  repeating that probe rather than trusting `javap` field lists when asking
+  "what does sjsonnet keep at runtime".
+- **`YamlRenderer` defaults to quoted keys and no trailing newline**; pass
+  `quoteKeys = false` for `tk show`-style output.
+- **Evaluation reads text via `VirtualFileText`** (live `Document` first). Keep
+  it that way: `SourceLocator` offsets and error positions are only meaningful
+  if they index the exact string sjsonnet parsed.
+- **Navigating from Preview changes the editor selection**, which Preview itself
+  listens to; `JsonnetPreviewPanel.jumpTarget` swallows that one event. The
+  test `preview jump into an imported file does not retarget the preview` fails
+  without the guard (verified by mutation).
+- macOS: `sed -i` needs `sed -i ''` — the bare form eats the script as the
+  backup suffix and errors with "bad flag in substitute command".
+
 ## Grammar bugs hit and fixed (Jsonnet.bnf / Jsonnet.flex)
 
 The first three were caught by the `ParsingTestCase`-based tests in

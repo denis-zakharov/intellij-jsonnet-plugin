@@ -1,20 +1,26 @@
 package com.dz.intellijjsonnet.editor.preview
 
 import com.dz.intellijjsonnet.engine.JsonnetEngine
+import com.dz.intellijjsonnet.engine.VirtualFilePath
 import com.dz.intellijjsonnet.lang.JsonnetFileType
 import com.dz.intellijjsonnet.lang.LibsonnetFileType
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.ToggleAction
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.EditorTextField
@@ -24,13 +30,21 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.util.Alarm
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
+import java.awt.GridLayout
+import java.awt.Point
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
+import javax.swing.text.BadLocationException
 import javax.swing.JPanel
 
 /**
- * Full-eval Preview: shows the embedded interpreter's JSON output for
- * whichever Jsonnet file is currently focused, auto-refreshing (debounced) as
- * you type. `ext-str`/`ext-code` vars are a simple `key=value`-per-line box;
- * TLA vars, YAML output, and output→source click-jump are follow-ups, not v1.
+ * Full-eval Preview: shows the embedded interpreter's JSON (or YAML) output
+ * for whichever Jsonnet file is currently focused, auto-refreshing (debounced)
+ * as you type. Ext vars and TLA vars are each a one-variable-per-line box —
+ * see [PreviewVars] for the `name=string` / `name:=code` syntax. Ctrl/Cmd+click
+ * on an output line jumps to the source expression that produced that value
+ * (possibly in an imported file) — see [PreviewOutputPaths] and
+ * [com.dz.intellijjsonnet.engine.SourceLocator].
  */
 class JsonnetPreviewPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
 
@@ -39,17 +53,30 @@ class JsonnetPreviewPanel(private val project: Project) : JPanel(BorderLayout())
         isEditable = false
         font = java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 12)
     }
-    private val extVarsField = EditorTextField("").apply {
-        setOneLineMode(false)
-        preferredSize = java.awt.Dimension(200, 60)
-    }
+    private val extVarsField = varsField()
+    private val tlaVarsField = varsField()
+    private var yamlOutput = false
     private var currentFile: VirtualFile? = null
 
+    /** The last successful render, kept for click-jump; `null` while the output area shows an error/placeholder instead. */
+    private var lastSuccess: JsonnetEngine.Result.Success? = null
+    private var lastFormat = JsonnetEngine.OutputFormat.JSON
+
+    /** A file we just opened ourselves via click-jump: its selection event must not re-target Preview at it. */
+    private var jumpTarget: VirtualFile? = null
+
     init {
-        val header = JPanel(BorderLayout())
-        header.add(JBLabel("ext vars (key=value, one per line):"), BorderLayout.NORTH)
-        header.add(extVarsField, BorderLayout.CENTER)
+        val header = JPanel(GridLayout(1, 2, JBUI.scale(8), 0))
+        header.add(labeled("ext vars (name=string, name:=code):", extVarsField))
+        header.add(labeled("TLA vars (name=string, name:=code):", tlaVarsField))
         header.border = JBUI.Borders.empty(4)
+
+        output.toolTipText = "Ctrl/Cmd+click a line to jump to the source that produced it"
+        output.addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent) {
+                if (e.button == MouseEvent.BUTTON1 && (e.isControlDown || e.isMetaDown)) jumpToSource(e.point)
+            }
+        })
 
         add(header, BorderLayout.NORTH)
         add(JBScrollPane(output), BorderLayout.CENTER)
@@ -58,13 +85,25 @@ class JsonnetPreviewPanel(private val project: Project) : JPanel(BorderLayout())
         actionGroup.add(object : AnAction("Refresh", "Re-evaluate the current file", com.intellij.icons.AllIcons.Actions.Refresh) {
             override fun actionPerformed(e: AnActionEvent) = refresh()
         })
+        actionGroup.add(object : ToggleAction("YAML Output", "Render the output as YAML instead of JSON", com.intellij.icons.AllIcons.FileTypes.Yaml) {
+            override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+            override fun isSelected(e: AnActionEvent): Boolean = yamlOutput
+            override fun setSelected(e: AnActionEvent, state: Boolean) {
+                yamlOutput = state
+                refresh()
+            }
+        })
         val toolbar = ActionManager.getInstance().createActionToolbar(ActionPlaces.TOOLWINDOW_CONTENT, actionGroup, true)
         toolbar.targetComponent = this
         add(toolbar.component, BorderLayout.WEST)
 
-        extVarsField.document.addDocumentListener(object : DocumentListener {
-            override fun documentChanged(event: DocumentEvent) = scheduleRefresh()
-        })
+        for (field in listOf(extVarsField, tlaVarsField)) {
+            field.document.addDocumentListener(object : DocumentListener {
+                override fun documentChanged(event: DocumentEvent) = scheduleRefresh()
+            })
+        }
+
+        watchJsonnetDocuments()
 
         project.messageBus.connect(this).subscribe(
             FileEditorManagerListener.FILE_EDITOR_MANAGER,
@@ -80,18 +119,23 @@ class JsonnetPreviewPanel(private val project: Project) : JPanel(BorderLayout())
 
     private fun onFileFocused(file: VirtualFile?) {
         if (file == null || (file.fileType != JsonnetFileType && file.fileType != LibsonnetFileType)) return
+        if (file == jumpTarget) return
         if (file == currentFile) return
         currentFile = file
-        watchDocument(file)
         refresh()
     }
 
-    private fun watchDocument(file: VirtualFile) {
-        val document = FileDocumentManager.getInstance().getDocument(file) ?: return
-        document.addDocumentListener(
+    /**
+     * Any Jsonnet buffer changing can change the focused file's output (it may import the one being
+     * edited, e.g. in a split editor), and evaluation reads live buffers — see
+     * [com.dz.intellijjsonnet.engine.VirtualFileText] — so listen to all of them, not just the focused one.
+     */
+    private fun watchJsonnetDocuments() {
+        EditorFactory.getInstance().eventMulticaster.addDocumentListener(
             object : DocumentListener {
                 override fun documentChanged(event: DocumentEvent) {
-                    if (currentFile == file) scheduleRefresh()
+                    val type = FileDocumentManager.getInstance().getFile(event.document)?.fileType
+                    if (type == JsonnetFileType || type == LibsonnetFileType) scheduleRefresh()
                 }
             },
             this,
@@ -103,24 +147,66 @@ class JsonnetPreviewPanel(private val project: Project) : JPanel(BorderLayout())
         alarm.addRequest({ refresh() }, 400)
     }
 
-    private fun parseExtVars(): Map<String, String> =
-        extVarsField.text.lineSequence()
-            .mapNotNull { line ->
-                val idx = line.indexOf('=')
-                if (idx <= 0) null else line.substring(0, idx).trim() to line.substring(idx + 1).trim()
-            }
-            .toMap()
+    private fun varsField() = EditorTextField("").apply {
+        setOneLineMode(false)
+        preferredSize = java.awt.Dimension(200, 60)
+    }
+
+    private fun labeled(label: String, field: EditorTextField) = JPanel(BorderLayout()).apply {
+        add(JBLabel(label), BorderLayout.NORTH)
+        add(field, BorderLayout.CENTER)
+    }
+
+    internal val outputText: String get() = output.text
+    internal var yamlEnabled: Boolean
+        get() = yamlOutput
+        set(value) { yamlOutput = value }
 
     fun refresh() {
+        lastSuccess = null
         val file = currentFile ?: run {
             output.text = "(no Jsonnet file focused)"
             return
         }
-        val result = JsonnetEngine.evaluateFile(file, extVars = parseExtVars())
+        val format = if (yamlOutput) JsonnetEngine.OutputFormat.YAML else JsonnetEngine.OutputFormat.JSON
+        val result = JsonnetEngine.evaluateFile(
+            file,
+            extVars = PreviewVars.parse(extVarsField.text),
+            tlaVars = PreviewVars.parse(tlaVarsField.text),
+            format = format,
+        )
         output.text = when (result) {
-            is JsonnetEngine.Result.Success -> result.json
+            is JsonnetEngine.Result.Success -> {
+                lastSuccess = result
+                lastFormat = format
+                result.output
+            }
             is JsonnetEngine.Result.Failure -> "Evaluation failed:\n${result.message}"
         }
+        output.caretPosition = 0
+    }
+
+    private fun jumpToSource(point: Point) {
+        val line = try {
+            output.getLineOfOffset(output.viewToModel2D(point))
+        } catch (e: BadLocationException) {
+            return
+        }
+        jumpToLine(line)
+    }
+
+    /** Maps the 0-based output [line] to a value path, asks sjsonnet where that value came from, and opens it. */
+    internal fun jumpToLine(line: Int) {
+        val success = lastSuccess ?: return
+        val locator = success.locator ?: return
+        val segments = PreviewOutputPaths.pathForLine(output.text, lastFormat, line) ?: return
+        val location = locator.locate(segments) ?: return
+        val target = (location.path as? VirtualFilePath)?.file ?: return
+
+        jumpTarget = target
+        OpenFileDescriptor(project, target, location.offset).navigate(true)
+        // The selection event (if any) fires synchronously above; don't let a stale marker swallow a later real focus.
+        ApplicationManager.getApplication().invokeLater { jumpTarget = null }
     }
 
     override fun dispose() {

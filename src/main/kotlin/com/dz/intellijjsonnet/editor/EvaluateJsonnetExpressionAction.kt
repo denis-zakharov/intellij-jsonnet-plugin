@@ -47,7 +47,7 @@ class EvaluateJsonnetExpressionAction : AnAction() {
 
         val source = leadingLocalsPrefix(file) + selection
         when (val result = JsonnetEngine.evaluate(file.name, source)) {
-            is JsonnetEngine.Result.Success -> Messages.showInfoMessage(project, result.json, "Jsonnet Evaluation Result")
+            is JsonnetEngine.Result.Success -> Messages.showInfoMessage(project, result.output, "Jsonnet Evaluation Result")
             is JsonnetEngine.Result.Failure -> Messages.showErrorDialog(project, result.message, "Jsonnet Evaluation Failed")
         }
     }

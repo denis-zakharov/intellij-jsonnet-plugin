@@ -101,6 +101,8 @@
             language="Jsonnet"
             implementationClass="com.dz.intellijjsonnet.editor.JsonnetSemanticHighlightingAnnotator"/>
 
+        <colorSettingsPage implementation="com.dz.intellijjsonnet.editor.JsonnetColorSettingsPage"/>
+
         <codeInsight.parameterNameHints
             language="Jsonnet"
             implementationClass="com.dz.intellijjsonnet.editor.JsonnetInlayParameterHintsProvider"/>

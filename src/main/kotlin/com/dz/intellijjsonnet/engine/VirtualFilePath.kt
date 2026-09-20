@@ -7,9 +7,8 @@ import com.intellij.openapi.vfs.VirtualFile
 
 /**
  * [Path] backed by a real [VirtualFile], so imports resolve against the IDE's
- * own view of the project tree. Reads go straight to disk via the VFS (not
- * through unsaved editor buffers) — a deliberate v1 simplification; honoring
- * unsaved buffers is a natural follow-up once this proves out.
+ * own view of the project tree. Text comes from [VirtualFileText], i.e. the
+ * live editor buffer when there is one, so unsaved edits are visible.
  */
 class VirtualFilePath(val file: VirtualFile) : Path {
 
@@ -46,7 +45,7 @@ class VirtualFilePath(val file: VirtualFile) : Path {
     }
 
     fun readTextOrEmpty(): String = try {
-        VfsUtilCore.loadText(file)
+        VirtualFileText.read(file)
     } catch (e: Exception) {
         ""
     }

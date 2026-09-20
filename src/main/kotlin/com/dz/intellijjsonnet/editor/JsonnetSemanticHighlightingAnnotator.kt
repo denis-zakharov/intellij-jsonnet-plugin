@@ -25,9 +25,9 @@ import com.intellij.psi.TokenType
  * [JsonnetLocalReference]/[JsonnetFieldReference]), so it has to be an
  * [Annotator], not a `SyntaxHighlighter`. Colors both declaration and usage
  * sites the same way, matching how IDEs usually highlight these categories.
- * No dedicated `ColorSettingsPage` — the fallback attributes below already
- * match the current scheme's existing local/parameter/field/static-method
- * colors, and a customization UI is a nicety, not correctness.
+ * The fallback attributes below match the current scheme's existing
+ * local/parameter/field/static-method colors; [JsonnetColorSettingsPage] is
+ * where a user overrides them independently.
  */
 class JsonnetSemanticHighlightingAnnotator : Annotator {
 
