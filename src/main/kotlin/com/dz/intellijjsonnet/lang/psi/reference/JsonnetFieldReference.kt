@@ -5,6 +5,7 @@ import com.dz.intellijjsonnet.lang.psi.JsonnetElementFactory
 import com.dz.intellijjsonnet.lang.psi.JsonnetExpr
 import com.dz.intellijjsonnet.lang.psi.JsonnetTypes
 import com.dz.intellijjsonnet.lang.psi.nameIdentifier
+import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementResolveResult
 import com.intellij.psi.PsiPolyVariantReferenceBase
@@ -52,4 +53,12 @@ class JsonnetFieldReference(element: JsonnetDotSuffix) : PsiPolyVariantReference
     }
 
     override fun getVariants(): Array<Any> = emptyArray()
+
+    // No ElementManipulator is registered for JsonnetDotSuffixImpl, and the
+    // default range (the whole `.foo` suffix, including the dot) would be
+    // wrong anyway — see the matching note in JsonnetLocalReference.
+    override fun getRangeInElement(): TextRange {
+        val id = element.nameIdentifier ?: return super.getRangeInElement()
+        return id.textRange.shiftLeft(element.textRange.startOffset)
+    }
 }

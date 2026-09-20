@@ -25,15 +25,29 @@ ecosystem at all — see the plan doc).
 ## Build system
 
 - **Use `./gradlew`**, not a system `gradle` — the wrapper is checked in
-  (`gradle/wrapper/`, Gradle 9.3.0). No hardcoded JDK path anywhere; both
+  (`gradle/wrapper/`, Gradle 9.3.0). No hardcoded JDK *path* anywhere; both
   `build.gradle.kts` and `shaded-sjsonnet/build.gradle.kts` declare a
   `java { toolchain { languageVersion = 21 } }` / `kotlin { jvmToolchain(21) }`
-  block, so the Gradle *daemon* can run on whatever JVM is on PATH (JDK 25 on
-  the dev machine) while compilation targets JDK 21. **Both modules need the
-  toolchain block** — omitting it on `shaded-sjsonnet` causes a "compatible
-  with JVM runtime version 25, but ... only compatible with 21" resolution
-  failure, because Gradle attaches a JVM-version attribute to consumable
-  configurations even for a module with no real sources.
+  block, so compilation always targets JDK 21 regardless of which JDK
+  actually runs Gradle. **Both modules need the toolchain block** — omitting
+  it on `shaded-sjsonnet` causes a "compatible with JVM runtime version 25,
+  but ... only compatible with 21" resolution failure, because Gradle
+  attaches a JVM-version attribute to consumable configurations even for a
+  module with no real sources.
+- **The Gradle *daemon* itself is pinned to JDK 21** via a checked-in
+  `gradle/gradle-daemon-jvm.properties` (Gradle's "daemon toolchain" feature,
+  `./gradlew updateDaemonJvm --jvm-version=21` — needs
+  `org.gradle.toolchains.foojay-resolver-convention` **version `1.0.0`**
+  applied in `settings.gradle.kts`'s top-level `plugins {}` block; older `0.x`
+  versions fail against this Gradle version's `JvmVendorSpec` API). This is a
+  toolchain *version number*, not a path, so it stays portable — but it does
+  mean the daemon no longer just inherits whatever JVM is on `PATH`. This
+  exists because the Kotlin Gradle Plugin here (2.0.21, pre-dates JDK 25) forks
+  its Compile Daemon from the Gradle daemon's own JVM, and its vendored
+  `JavaVersion` parser throws on any JDK-25-family version string — see
+  AGENTS.md's Testing section for the full symptom/diagnosis if this
+  resurfaces (e.g. after a Kotlin/Gradle plugin upgrade removes the need for
+  the pin, or a new JDK major version needs the same treatment).
 - Two modules: root plugin + `:shaded-sjsonnet` (shades `sjsonnet` + its Scala
   3 runtime into `com.dz.intellijjsonnet.shaded.*` so it can't collide with
   JetBrains' own bundled Scala plugin). The shaded dependency lives in a
@@ -206,29 +220,127 @@ throws a confusing error deep inside an unrelated construct).
   `CommandProcessor`. Anything needing those throws a clean NPE naming the
   missing service — that's a hard signal to stop and mark the code
   reviewed-but-untested rather than fight the fixture.
-- **`BasePlatformTestCase`** (the heavier fixture with a real project/VFS)
-  **hung indefinitely (16+ minutes, no output) when tried once in this
-  sandbox environment** and was killed. Not reattempted since. If a future
-  session wants real VFS/rename/reformat integration tests, budget for this
-  risk explicitly — try it in a background task with a hard time-box, and be
-  ready to abandon and fall back to code review if it hangs again. Don't
-  assume it'll behave differently just because more code has accumulated.
-- Consequence: `VirtualFilePath`/`VirtualFileImporter` (Phase 2),
-  `TankaJpath` (Phase 3), both write-paths added in Phase 4
-  (`setName`/`handleElementRename`, and the native formatter's actual
-  `CodeStyleManager.reformat()` invocation), and Phase 5's
-  `JsonnetUnusedDeclarationInspection`/quick-fix wiring (plus the stub-tree
-  building/deserialization machinery from the Phase 4 stub-index work) are
-  all **reviewed but not automated-tested** in this repo. Their *read-side*
-  logic (pure PSI navigation and reference resolution with no service
-  dependency — e.g. `TankaNativeFunctions` receiver detection, `TankaTkModule`
-  access-chain walking, `PsiNameIdentifierOwner.getName()`,
+- **`BasePlatformTestCase` now works fine in this environment** — the earlier
+  "hangs indefinitely (16+ min)" report was wrong about the cause. Root-caused
+  in a later session (see `JsonnetPlatformIntegrationTest.kt`, which covers
+  exactly the write paths this used to say were untestable): it's not the
+  fixture, it's two independent, real bugs the fixture's strict
+  `TestLoggerFactory` (which turns a logged `error()` into a hard test
+  failure) exposed that plain code review never would have:
+  1. `JsonnetFileType.kt`'s `LibsonnetFileType` had `getName()` hardcoded to
+     `"Jsonnet"` (copy-paste from `JsonnetFileType`) instead of `"Libsonnet"`,
+     which `plugin.xml`'s `<fileType name="Libsonnet">` declares. The
+     platform's `FileTypeManagerImpl` asserts these match at startup; the
+     mismatch throws deep inside `StubIndexImpl`'s async initialization,
+     which **wedges a `CompletableFuture` that `BasePlatformTestCase
+     .tearDown()`'s leak-check (`waitUntilStubIndexedInitialized`) awaits with
+     no timeout** — that's the actual 16-minute "hang." A `jstack` dump of the
+     stuck `Test worker` thread during a repro (see git history around the
+     TODO.md item 1 fix for the exact stack) pointed straight at it. Once
+     fixed, the same test suite completes in ~3 seconds.
+  2. Separately, `PsiReferenceBase.getRangeInElement()`'s default impl throws
+     `PluginException: No ElementManipulator instance registered for
+     JsonnetNameRefImpl`/`JsonnetDotSuffixImpl` — but *only* from text-based
+     reference search (rename's "other usages" pass, Find Usages), not plain
+     `resolve()`, which is exactly the kind of thing a `ParsingTestCase`-only
+     test suite can never exercise. Fixed by overriding `getRangeInElement()`
+     directly in `JsonnetLocalReference`/`JsonnetFieldReference` instead of
+     registering an `ElementManipulator`.
+  If `BasePlatformTestCase` ever appears to hang again, don't assume it's the
+  fixture — grab a `jstack` dump of the `GradleWorkerMain`/`Test worker`
+  thread first (see the diagnostic-script pattern used to root-cause this,
+  worth reconstructing from git history if needed) before spending time on
+  workarounds. It's much more likely to be a real bug like these two.
+- **Writing the very first `BasePlatformTestCase` test in this repo also hit
+  an unrelated, environment-level build bug**, separate from the above and
+  worth knowing about if `./gradlew compileTestKotlin`/`test` suddenly starts
+  throwing `IllegalArgumentException: 25.0.4` from deep inside
+  `kotlin-compiler-embeddable`'s vendored `JavaVersion.parse`: the Kotlin
+  Compile Daemon is forked from whatever JVM launched the **Gradle daemon**
+  (not from the per-module toolchain JDK — that only controls `-jdk-home`,
+  i.e. the *target* JDK for compiled output, not which JVM actually *runs*
+  the daemon process), and this repo's Kotlin Gradle Plugin version (2.0.21,
+  from before JDK 25 existed) can't parse a JDK-25-family version string at
+  all — it throws regardless of the exact patch number. Since AGENTS.md's
+  build-system section deliberately allows the Gradle daemon to run on
+  whatever JDK is on `PATH` (may be JDK 25 on a given dev machine), this can
+  resurface on a fresh machine/JDK upgrade. **Fixed portably, without
+  hardcoding any JDK path**, via Gradle's own "daemon toolchain" feature: a
+  checked-in `gradle/gradle-daemon-jvm.properties` (generated via `./gradlew
+  updateDaemonJvm --jvm-version=21`, which needs the
+  `org.gradle.toolchains.foojay-resolver-convention` plugin — **use version
+  `1.0.0`**, not the `0.x` you'd naively guess first; older versions reference
+  a `JvmVendorSpec.IBM_SEMERU` field this Gradle version removed and fail with
+  a confusing `Invalid task configuration` error) pins the *Gradle daemon
+  itself* to JDK 21 by feature version, resolved against locally installed
+  toolchains — no absolute path anywhere. If this regresses, verify with
+  `./gradlew someTask --info | grep "Starting process 'Gradle build daemon'"`
+  that the daemon launches on a JDK 21 binary, not whatever's on `PATH`.
+- Consequence of all the above: `VirtualFilePath`/`VirtualFileImporter`
+  (Phase 2), rename (`setName`/`handleElementRename`), the native formatter's
+  `CodeStyleManager.reformat()` invocation, the stub-index build/query
+  pipeline, and `JsonnetUnusedDeclarationInspection`'s quick-fix wiring are
+  now **covered by `JsonnetPlatformIntegrationTest.kt`** (11 tests), which
+  also caught three more real, previously-invisible bugs while being written
+  — worth knowing about since they're the kind of thing that could easily
+  recur in similar code elsewhere:
+  - `JsonnetResolver.resolveLocalName` had no `is JsonnetBind` case, so a
+    function-sugar bind's own parameters (`local f(x) = x + 1;` — the single
+    most common Jsonnet idiom) **never resolved inside the function body at
+    all**. Go-to-definition, rename, and (very likely) the unresolved-
+    reference annotator were all silently broken for this case since Phase 1.
+    Fixed by adding the missing branch (mirrors the existing
+    `JsonnetFunctionExpr`/`JsonnetField` handling).
+  - `JsonnetStubIndexUtil.isTopLevelExpr`'s `JsonnetBind`/`JsonnetField`
+    branches didn't check `paramList == null` before recursing, so anything
+    nested inside a function-sugar body (`local f(x) = local y = ...; y;`)
+    was incorrectly stub-indexed as if top-level — directly contradicting the
+    class's own documented intent ("excludes anything nested inside a
+    function body"). Fixed by adding the `paramList == null` guard.
+  - `JsonnetBlock.getIndent()` only special-cased `RBRACE`/`RBRACK` (the
+    *closing* bracket), not `LBRACE`/`LBRACK` — so every opening brace got an
+    extra, unwanted indent level relative to its own container, which (via
+    how the formatting engine anchors subsequent sibling lines) pushed the
+    *entire* reformatted block one level too deep, and doubled up further for
+    genuinely nested content via a second, independent bug (see the next
+    point). Fixed by including `LBRACE`/`LBRACK` in the `NoneIndent` case.
+  - `JsonnetBlock.getIndent()` also double-indented every object/array
+    member: `objectLiteral`/`arrayLiteral` wrap a *separate*
+    `objectMemberList`/`arrayMemberList` node (see `Jsonnet.bnf`), and both
+    that wrapper and its own children were in `INDENTED_CONTAINERS`, so a
+    field inherited indent from both its literal grandparent and its
+    member-list parent. Fixed by making the member-list wrapper types
+    "transparent" (`Indent.getNoneIndent()` for themselves, deferring the
+    single indent level to their children).
+  - `JsonnetPsiListEditUtil.deleteListMember` deleted the member and its
+    adjacent comma as two separate `PsiElement.delete()` calls, leaving the
+    whitespace *between* them (a separate sibling node) behind — e.g.
+    removing an unused local from `local used = 1, unused = 2; used` left
+    `local used = 1 ; used` (stray space before `;`). Worse, chaining two
+    `.delete()` calls could throw `PsiInvalidElementAccessException` on the
+    second one once other fixes changed the tree shape enough to trigger
+    rebalancing. Fixed with `ASTDelegatePsiElement.deleteChildRange`, the
+    standard IntelliJ idiom for deleting a contiguous run of sibling AST
+    nodes atomically.
+  None of these five were hypothetical — each had a concrete, minimal
+  failing input surfaced by an actual test run, not by inspection. Lesson,
+  extending the one from the Resolver section above: **write the
+  `BasePlatformTestCase` test *first*, expect it to fail for a real reason on
+  the first run, and read the actual diff/exception rather than assuming a
+  fixture problem** — every one of these five bugs looked, at first glance,
+  like it could plausibly be a test-authoring mistake, and every one turned
+  out not to be.
+- Their *read-side* logic (pure PSI navigation and reference resolution with
+  no service dependency — e.g. `TankaNativeFunctions` receiver detection,
+  `TankaTkModule` access-chain walking, `PsiNameIdentifierOwner.getName()`,
   `JsonnetUnusedDeclarationUtil`'s detection logic, `JsonnetStubIndexUtil`'s
   top-level/vendor logic, the inlay-hints provider's param resolution) is
-  tested wherever it could be split out from the service-dependent wiring
-  around it — that split is the reusable pattern here: keep anything
-  `PsiFileFactory`/`CodeStyleManager`/VFS-shaped as thin as possible, put the
-  actual logic in a plain object next to it, and test that object directly.
+  additionally unit-tested wherever it could be split out from the
+  service-dependent wiring around it — that split is still the reusable
+  pattern here: keep anything `PsiFileFactory`/`CodeStyleManager`/VFS-shaped
+  as thin as possible, put the actual logic in a plain object next to it, and
+  test that object directly at both levels (fast unit test for the logic,
+  `BasePlatformTestCase` test for the end-to-end wiring).
 
 ## Sandbox/environment quirks (not project-specific, but bit this session)
 

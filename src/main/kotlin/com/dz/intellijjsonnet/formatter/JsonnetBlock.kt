@@ -36,6 +36,21 @@ class JsonnetBlock(
             JsonnetTypes.ARG_LIST,
             JsonnetTypes.PARAM_LIST,
         )
+
+        // objectLiteral/arrayLiteral wrap a *separate* objectMemberList/
+        // arrayMemberList node holding the actual members (see Jsonnet.bnf),
+        // unlike argList/paramList which have no such wrapper and hold their
+        // elements directly. Both the wrapper and its members are in
+        // INDENTED_CONTAINERS (the wrapper needs to be there so a member's
+        // *own* nested containers still indent correctly), so without this,
+        // a member would inherit indent from both its literal grandparent
+        // and its member-list parent — double-indenting every field/element
+        // one level too deep. The wrapper itself is purely structural (it
+        // never starts its own line), so it carries no indent of its own.
+        private val TRANSPARENT_LIST_WRAPPERS = setOf(
+            JsonnetTypes.OBJECT_MEMBER_LIST,
+            JsonnetTypes.ARRAY_MEMBER_LIST,
+        )
     }
 
     override fun buildChildren(): MutableList<Block> {
@@ -51,13 +66,19 @@ class JsonnetBlock(
     }
 
     override fun getIndent(): Indent? {
+        if (myNode.elementType in TRANSPARENT_LIST_WRAPPERS) return Indent.getNoneIndent()
         val parentType = myNode.treeParent?.elementType ?: return Indent.getNoneIndent()
         if (parentType !in INDENTED_CONTAINERS) return Indent.getNoneIndent()
-        // The closing bracket/brace itself (and the container's own opening one,
-        // which is this same node when parentType matches on the literal itself)
-        // sits back at the container's own indent level, not one level deeper.
+        // Both bracket tokens sit at the container's own indent level, not one
+        // deeper — only the interior list (the actual indented content) should
+        // get NORMAL. Missing this for the *opening* bracket (originally only
+        // RBRACE/RBRACK were excluded) meant the formatter's line-1 block
+        // started a new line pretending to be an already-indented continuation,
+        // which pushed every level below it (including outer closing braces,
+        // via the engine's own "the opening line was already indented as if
+        // deeper" bookkeeping) one level too deep — see the reformat test.
         return when (myNode.elementType) {
-            JsonnetTypes.RBRACE, JsonnetTypes.RBRACK -> Indent.getNoneIndent()
+            JsonnetTypes.LBRACE, JsonnetTypes.RBRACE, JsonnetTypes.LBRACK, JsonnetTypes.RBRACK -> Indent.getNoneIndent()
             else -> Indent.getNormalIndent()
         }
     }

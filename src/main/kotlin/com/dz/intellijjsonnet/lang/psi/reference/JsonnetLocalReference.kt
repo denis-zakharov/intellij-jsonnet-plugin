@@ -3,6 +3,7 @@ package com.dz.intellijjsonnet.lang.psi.reference
 import com.dz.intellijjsonnet.lang.psi.JsonnetElementFactory
 import com.dz.intellijjsonnet.lang.psi.JsonnetNameRef
 import com.dz.intellijjsonnet.lang.psi.nameIdentifier
+import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementResolveResult
 import com.intellij.psi.PsiPolyVariantReferenceBase
@@ -23,6 +24,16 @@ class JsonnetLocalReference(element: JsonnetNameRef) : PsiPolyVariantReferenceBa
     }
 
     override fun isSoft(): Boolean = element.nameIdentifier?.text == "std"
+
+    // No ElementManipulator is registered for JsonnetNameRefImpl, so the
+    // PsiReferenceBase default (which needs one to compute this) throws —
+    // only surfaces via text-based reference search (rename's "other
+    // usages" pass, Find Usages), not simple resolve(), which is why this
+    // went unnoticed until BasePlatformTestCase-based rename tests existed.
+    override fun getRangeInElement(): TextRange {
+        val id = element.nameIdentifier ?: return super.getRangeInElement()
+        return id.textRange.shiftLeft(element.textRange.startOffset)
+    }
 
     override fun handleElementRename(newElementName: String): PsiElement {
         element.nameIdentifier?.replace(JsonnetElementFactory.createIdentifierLeaf(element.project, newElementName))

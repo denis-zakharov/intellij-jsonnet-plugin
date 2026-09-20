@@ -43,8 +43,12 @@ object JsonnetStubIndexUtil {
         return when (val parent = expr.parent) {
             is JsonnetFile -> true
             is JsonnetLocalExpr -> parent.expr === expr && (parent.parent as? JsonnetExpr)?.let(::isTopLevelExpr) == true
-            is JsonnetBind -> parent.expr === expr && isTopLevelBindDecl(parent)
-            is JsonnetField -> parent.expr === expr && isTopLevelFieldDecl(parent)
+            // A non-null paramList means `bind`/`field` is function-sugar
+            // (`f(x) = ...` / `f(x): ...`) — its expr is a function body, not
+            // a plain value, so anything nested in it is implementation
+            // detail, not part of the top-level tree (see the class doc).
+            is JsonnetBind -> parent.expr === expr && parent.paramList == null && isTopLevelBindDecl(parent)
+            is JsonnetField -> parent.expr === expr && parent.paramList == null && isTopLevelFieldDecl(parent)
             else -> false
         }
     }

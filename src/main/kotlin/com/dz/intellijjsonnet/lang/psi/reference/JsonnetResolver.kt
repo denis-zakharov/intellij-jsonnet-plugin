@@ -1,6 +1,7 @@
 package com.dz.intellijjsonnet.lang.psi.reference
 
 import com.dz.intellijjsonnet.lang.psi.JsonnetArrayComprehension
+import com.dz.intellijjsonnet.lang.psi.JsonnetBind
 import com.dz.intellijjsonnet.lang.psi.JsonnetExpr
 import com.dz.intellijjsonnet.lang.psi.JsonnetField
 import com.dz.intellijjsonnet.lang.psi.JsonnetFunctionExpr
@@ -29,6 +30,10 @@ object JsonnetResolver {
             when (parent) {
                 is JsonnetLocalExpr -> {
                     parent.bindList.firstOrNull { it.nameIdentifier?.text == name }?.let { return it }
+                }
+                // `local f(x) = ...`-style function-sugar: `x` must resolve inside the body.
+                is JsonnetBind -> {
+                    parent.paramList?.paramList?.firstOrNull { it.nameIdentifier?.text == name }?.let { return it }
                 }
                 is JsonnetParamList -> {
                     parent.paramList.firstOrNull { it.nameIdentifier?.text == name }?.let { return it }

@@ -16,26 +16,33 @@ higher user-facing impact rank first.
 
 ## P0 — Trust gaps (verify or fix before relying on the plugin at scale)
 
-### 1. Get `BasePlatformTestCase` working in this environment
-The single most recurring gap across Phases 2, 4, and 5: every write-path
-feature (rename, `setName`/`handleElementRename`, the formatter's
-`CodeStyleManager.reformat()` call, the stub-tree build/deserialize
-machinery from the Phase 4 stub index, the `JsonnetUnusedDeclarationInspection`
-quick fixes) is **reviewed but not automated-tested**, because this fixture
-hung indefinitely (16+ min, no output) every time it was tried and was
-killed rather than debugged. Nobody has actually confirmed rename or
-reformat work end-to-end in a real IDE session.
-- **Why P0:** it's not that a feature is missing — it's that several
-  features' correctness is simply unknown. A silent regression in any of
-  them would ship undetected.
-- **Where to start:** `AGENTS.md`'s "Testing" section has the exact repro
-  history. First step should be root-causing the hang itself (headless mode
-  flag? missing display server? a specific service — `CommandProcessor`,
-  `PsiDocumentManager` — deadlocking on init?) rather than trying the whole
-  fixture again and re-killing it. Consider running it with a hard time-box
-  in a background task and capturing thread dumps on timeout.
-- **Payoff:** retroactively covers Phase 2 (VFS importer), Phase 4 (rename,
-  formatter), and Phase 5 (inspection quick fixes) in one unblock.
+### 1. ~~Get `BasePlatformTestCase` working in this environment~~ — DONE
+Root-caused and fixed. The "hang" was never the fixture — it was a real bug
+(`LibsonnetFileType.getName()` mismatched its `plugin.xml` declaration,
+corrupting `StubIndexImpl` init and wedging `tearDown()`'s leak-check on a
+future that never completed). Fixed, and `JsonnetPlatformIntegrationTest.kt`
+now gives real `BasePlatformTestCase` coverage for everything this item
+listed: rename (`setName`/`handleElementRename`), the formatter's actual
+`CodeStyleManager.reformat()` invocation, the stub-index build/query
+pipeline, and `JsonnetUnusedDeclarationInspection`'s quick-fix wiring.
+Writing those tests caught **four more real, previously-invisible bugs**,
+all now fixed (full detail in AGENTS.md's Testing section):
+- `JsonnetResolver.resolveLocalName` never resolved a function-sugar bind's
+  own parameters inside its body (`local f(x) = x + 1;`) — broken
+  go-to-definition/rename for the single most common Jsonnet idiom, since
+  Phase 1.
+- `JsonnetStubIndexUtil.isTopLevelExpr` indexed locals nested inside
+  function-sugar bodies as if top-level (missing a `paramList == null`
+  check), contradicting its own documented intent.
+- `JsonnetBlock`'s formatter double-indented every object/array member and
+  separately mis-indented the opening brace, together producing badly wrong
+  `Reformat Code` output on any nested structure.
+- `JsonnetPsiListEditUtil.deleteListMember` left stray whitespace behind
+  (and could throw `PsiInvalidElementAccessException`) when removing one
+  bind from a multi-bind `local`.
+- **Payoff realized:** Phase 2 (VFS importer), Phase 4 (rename, formatter,
+  stub index), and Phase 5 (inspection quick fixes) all now have real
+  end-to-end coverage, not just review. Items 2 and 3 below remain open.
 
 ### 2. Validate the stub index against a real large Tanka/vendor tree
 The Phase 4 stub-index layer (`lang/stubs/`) was built specifically to avoid

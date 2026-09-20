@@ -1,6 +1,7 @@
 package com.dz.intellijjsonnet.inspection
 
 import com.dz.intellijjsonnet.lang.psi.JsonnetTypes
+import com.intellij.extapi.psi.ASTDelegatePsiElement
 import com.intellij.psi.PsiElement
 import com.intellij.psi.TokenType
 
@@ -15,15 +16,16 @@ object JsonnetPsiListEditUtil {
     fun deleteListMember(member: PsiElement) {
         val next = nextNonWhitespace(member)
         val prev = prevNonWhitespace(member)
+        // deleteChildRange (not two separate .delete() calls) so the
+        // whitespace between the member and its comma — a separate sibling
+        // node — goes with it in one atomic AST edit, instead of being left
+        // behind as e.g. a stray space before `;` (or, worse, invalidating
+        // the second element's stale PsiElement reference after the first
+        // .delete() triggers its own tree rebalancing).
+        val parent = member.parent as? ASTDelegatePsiElement
         when {
-            next?.node?.elementType == JsonnetTypes.COMMA -> {
-                next.delete()
-                member.delete()
-            }
-            prev?.node?.elementType == JsonnetTypes.COMMA -> {
-                member.delete()
-                prev.delete()
-            }
+            next?.node?.elementType == JsonnetTypes.COMMA && parent != null -> parent.deleteChildRange(member, next)
+            prev?.node?.elementType == JsonnetTypes.COMMA && parent != null -> parent.deleteChildRange(prev, member)
             else -> member.delete()
         }
     }
