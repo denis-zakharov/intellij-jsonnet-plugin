@@ -85,6 +85,25 @@ class JsonnetParsingTest : ParsingTestCase("", "jsonnet", JsonnetParserDefinitio
         assertNoErrors("local nums = [1,2,3]; nums[1:3]")
     }
 
+    // Real Jsonnet spec grammar: `expr { ... }` (an object literal directly
+    // juxtaposed after any expression, no operator) is sugar for
+    // `expr + { ... }` — idiomatic and extremely common in real Tanka/
+    // k8s-libsonnet code (e.g. `deployment.new() { spec+: {...} } `). Missing
+    // entirely until a TODO.md item-2 scale test against a real
+    // jsonnet-libs/k8s-libsonnet checkout (~690 files) found exactly one
+    // parse failure, on exactly this construct.
+    fun `test object literal juxtaposed after a call is a mixin apply`() {
+        assertNoErrors("local patch = {}; local cronPatch = patch { mapContainers(f):: { x: f } }; cronPatch")
+    }
+
+    fun `test object literal juxtaposed after a bare name`() {
+        assertNoErrors("local base = { a: 1 }; base { b: 2 }")
+    }
+
+    fun `test two object literals juxtaposed back to back`() {
+        assertNoErrors("{ a: 1 } { b: 2 }")
+    }
+
     fun `test dollar field reference`() {
         assertNoErrors("{ tags: [1], root: \$.tags }")
     }

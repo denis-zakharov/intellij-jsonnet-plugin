@@ -44,22 +44,40 @@ all now fixed (full detail in AGENTS.md's Testing section):
   stub index), and Phase 5 (inspection quick fixes) all now have real
   end-to-end coverage, not just review. Items 2 and 3 below remain open.
 
-### 2. Validate the stub index against a real large Tanka/vendor tree
-The Phase 4 stub-index layer (`lang/stubs/`) was built specifically to avoid
-the plan's own predicted risk ("stub-indexing huge `vendor/` trees... could
-be slow") — but that risk was never actually measured. All coverage is
-`JsonnetStubIndexUtilTest` (pure logic, no real indexing). Nobody has opened
-an actual `jsonnet-libs`-sized checkout and confirmed indexing stays fast,
-`vendor/` exclusion actually keeps the index small, or "Navigate > Symbol"
-returns sane results at scale.
-- **Why P0-adjacent:** the whole feature was justified by a performance
-  claim that's still unverified — if it doesn't actually help, that's worth
-  knowing before more is built on top of it (e.g. quick-fixes that assume a
-  cheap global index).
-- **Where to start:** clone a real Tanka repo with a populated `vendor/`
-  (or synthesize one — hundreds of `.libsonnet` files with nested objects),
-  open it in a sandbox IDE run (`./gradlew runIde`), and check indexing time
-  + memory + Go to Symbol result quality.
+### 2. ~~Validate the stub index against a real large Tanka/vendor tree~~ — DONE
+Validated against a real, large corpus: a sparse shallow clone of
+`jsonnet-libs/k8s-libsonnet`'s `1.34/` directory (688 real `.libsonnet`
+files, ~7MB, deeply nested, heavy use of `::` hidden fields with
+string-literal names, function-sugar fields, computed values — genuinely
+representative of what a real Tanka `vendor/` tree looks like), copied into
+a `BasePlatformTestCase` project alongside a non-vendor project file, via a
+temporary investigation test (removed afterward — it pointed at an external
+fixture deliberately not checked into this repo; rerun this exact recipe if
+the numbers ever need re-checking, see the AGENTS.md write-up for the
+one-liner clone command).
+- **Performance claim confirmed, not just plausible:** copying all 688 files
+  into the project: ~1.4–1.8s. Stub-index build/query: ~9–19ms. A full extra
+  PSI-error-checking parse pass over all 688 files: ~770–800ms. Heap
+  delta: ~150–290MB. **Zero** vendor-path entries leaked into
+  `JsonnetBindIndex`/`JsonnetFieldIndex` (the `vendor/` exclusion holds at
+  scale), and a non-vendor top-level symbol was found correctly via the
+  index amid the large tree. The plan's original performance worry was
+  real to check but turns out unfounded — this is fast.
+- **Real payoff wasn't the performance number, though — it was a genuine
+  parser bug the corpus surfaced.** Every one of the 688 real files parsed
+  cleanly except one: `_custom/mapContainers.libsonnet` failed on `local
+  cronPatch = patch { mapContainers(f):: {...} }`. Root cause: the grammar's
+  `postfixSuffix` never supported real Jsonnet's `expr { ... }` "object
+  mixin juxtaposition" sugar (`expr { ... }` ≡ `expr + { ... }`) — an
+  idiomatic, extremely common construct in Tanka/k8s-libsonnet code
+  (`deployment.new() { spec+: {...} }`-shaped patterns) that was simply
+  missing from `Jsonnet.bnf` entirely. Fixed by adding `objectLiteral` as a
+  `postfixSuffix` alternative; re-ran against the same corpus afterward —
+  0/688 parse errors. Three permanent regression tests added to
+  `JsonnetParsingTest.kt`. **Lesson for item 2-shaped validation work
+  generally: running the parser against real, large, external code finds
+  the bugs no amount of hand-written fixture text will — worth doing again
+  whenever the grammar changes substantially.**
 
 ### 3. Wire sjsonnet's own `StaticOptimizer` for unresolved-reference diagnostics
 `JsonnetUnresolvedReferenceAnnotator` currently sources "is this identifier

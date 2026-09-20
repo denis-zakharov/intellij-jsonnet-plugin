@@ -158,7 +158,7 @@ ecosystem at all — see the plan doc).
 
 ## Grammar bugs hit and fixed (Jsonnet.bnf / Jsonnet.flex)
 
-All three were caught by the `ParsingTestCase`-based tests in
+The first three were caught by the `ParsingTestCase`-based tests in
 `JsonnetParsingTest.kt` (a "kitchen sink" test plus targeted regression
 cases) — **write a parser test for any new grammar construct**, this class of
 bug is otherwise silent (parses "successfully" with a wrong PSI shape, or
@@ -189,6 +189,31 @@ throws a confusing error deep inside an unrelated construct).
    match the *entire* text block (open through close) as one rule, instead of
    trying to detect the closer as a separate competing alternative in a
    custom lexer state.
+4. **`postfixSuffix` never supported real Jsonnet's `expr { ... }` "object
+   mixin juxtaposition" sugar** (`expr { ... }` ≡ `expr + { ... }`, no
+   operator token at all between them) — idiomatic and extremely common in
+   real Tanka/k8s-libsonnet code
+   (`deployment.new() { spec+: {...} }`-shaped patterns), just missing from
+   the grammar entirely (`postfixSuffix ::= dotSuffix | indexSuffix |
+   callSuffix`, no fourth alternative). Unlike bugs 1–3, this one was found
+   not by a hand-written `ParsingTestCase` fixture but by literally running
+   the parser over a real, large, external corpus — a sparse clone of
+   `jsonnet-libs/k8s-libsonnet`'s `1.34/` directory (688 real files) — as
+   part of TODO.md item 2's stub-index scale validation. Every other file
+   parsed cleanly; this construct was the one real gap. Fix: add
+   `objectLiteral` as a `postfixSuffix` alternative (matches the real
+   spec grammar's `expr3 objinside` production) — no ambiguity with
+   `objectLiteral` already being a valid `atom`, since `postfixExpr ::= atom
+   postfixSuffix*` already left-recursion-eliminates the same way `.`/`[]`/
+   `()` suffixes do. Confirmed via a rerun against the same corpus: 0/688
+   parse errors afterward. Three regression tests added to
+   `JsonnetParsingTest.kt`. **Lesson: a hand-written "kitchen sink" test
+   fixture, however thorough it feels, only covers constructs someone
+   thought to write — running the real parser over a large real-world
+   corpus (any `jsonnet-libs` package works; see TODO.md item 2 for the
+   exact sparse-clone recipe: `git clone --depth 1 --filter=blob:none
+   --sparse <repo> && git sparse-checkout set <one-version-dir>`) is worth
+   doing again whenever the grammar changes substantially, not just once.**
 
 ## Resolver bugs hit and fixed (lang/psi/reference/JsonnetResolver.kt)
 

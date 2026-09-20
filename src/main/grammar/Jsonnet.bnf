@@ -100,7 +100,14 @@ unaryOpExpr ::= (BANG | MINUS | PLUS | TILDE) unaryExpr {
 
 private postfixExpr ::= atom postfixSuffix*
 
-private postfixSuffix ::= dotSuffix | indexSuffix | callSuffix
+// objectLiteral (not a dedicated wrapper rule) is itself a valid suffix:
+// real Jsonnet spec grammar treats `expr { ... }` as sugar for
+// `expr + { ... }` ("object mixin juxtaposition") — extremely common in
+// real Tanka/k8s-libsonnet code (e.g. `deployment.new() { spec+: {...} }`).
+// Found missing entirely by TODO.md item 2's real-world-corpus scale test
+// against jsonnet-libs/k8s-libsonnet — every other construct in that ~690
+// file, 7MB tree parsed fine; this was the one genuine gap.
+private postfixSuffix ::= dotSuffix | indexSuffix | callSuffix | objectLiteral
 
 dotSuffix ::= DOT IDENTIFIER {
   pin=1
