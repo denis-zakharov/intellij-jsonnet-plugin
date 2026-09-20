@@ -1,5 +1,6 @@
 package com.dz.intellijjsonnet.tanka
 
+import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 
 /**
@@ -25,6 +26,20 @@ object TankaJpath {
         val base = findBase(startDir)
         val root = findRoot(startDir)
         return listOfNotNull(base, root?.findChild("vendor"), root?.findChild("lib"))
+    }
+
+    /**
+     * The single import-resolution rule shared by evaluation ([com.dz.intellijjsonnet.engine.importer.VirtualFileImporter])
+     * and the import graph view: relative to the importing file first (vanilla Jsonnet), then each
+     * [searchPath] root. May return a directory — callers decide whether that counts as resolved.
+     */
+    fun resolveImport(fromFile: VirtualFile, importName: String): VirtualFile? {
+        val fromDir = if (fromFile.isDirectory) fromFile else fromFile.parent ?: return null
+        VfsUtilCore.findRelativeFile(importName, fromDir)?.let { return it }
+        for (searchRoot in searchPath(fromFile)) {
+            VfsUtilCore.findRelativeFile(importName, searchRoot)?.let { return it }
+        }
+        return null
     }
 
     private fun ancestorContaining(startDir: VirtualFile, childName: String): VirtualFile? {

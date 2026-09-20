@@ -9,8 +9,6 @@ import com.dz.intellijjsonnet.shaded.sjsonnet.Path
 import com.dz.intellijjsonnet.shaded.sjsonnet.ResolvedFile
 import com.dz.intellijjsonnet.shaded.sjsonnet.StaticResolvedFile
 import com.dz.intellijjsonnet.tanka.TankaJpath
-import com.intellij.openapi.vfs.VfsUtilCore
-import com.intellij.openapi.vfs.VirtualFile
 
 /**
  * Resolves `import`/`importstr`/`importbin` against the IDE's VFS instead of
@@ -25,19 +23,9 @@ class VirtualFileImporter : Importer() {
 
     override fun resolve(docBase: Path, importName: String): Option<Path> {
         val base = docBase as? VirtualFilePath ?: return none()
-        val fromDir = if (base.file.isDirectory) base.file else base.file.parent ?: return none()
-
-        resolveRelativeTo(fromDir, importName)?.let { return some(VirtualFilePath(it)) }
-
-        for (searchRoot in TankaJpath.searchPath(base.file)) {
-            resolveRelativeTo(searchRoot, importName)?.let { return some(VirtualFilePath(it)) }
-        }
-
-        return none()
+        val target = TankaJpath.resolveImport(base.file, importName) ?: return none()
+        return some(VirtualFilePath(target))
     }
-
-    private fun resolveRelativeTo(dir: VirtualFile, importName: String): VirtualFile? =
-        VfsUtilCore.findRelativeFile(importName, dir)
 
     override fun read(path: Path, binaryData: Boolean): Option<ResolvedFile> {
         val vfp = path as? VirtualFilePath ?: return none()

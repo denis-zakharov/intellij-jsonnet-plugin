@@ -164,29 +164,47 @@ semantic key, demo text is valid, evaluates, and every tag is mapped.
 
 ## P2 — Stretch items deferred in the plan doc
 
-### 7. Lightweight import-graph view (not the full `DiagramProvider`)
-Phase 5's import-graph item was deferred outright because `com.intellij
-.diagram`'s `DiagramProvider` framework is heavy and version-fragile, and
-this environment can't visually verify one. A much cheaper alternative:
-a simple read-only panel (reusing `TankaJpath`'s already-working resolution)
-listing import edges as a tree or a basic rendered graph, with no dependency
-on the diagram framework at all.
-- **Effort:** low-moderate for a tree-view version; the full `DiagramProvider`
-  version stays a separate, larger, higher-risk task — do this instead unless
-  a session specifically wants the "real" diagram integration and can test it
-  live.
+### 7. ~~Lightweight import-graph view (not the full `DiagramProvider`)~~ — DONE
+"Jsonnet Imports" tool window (`imports/`): a tree of what the focused file
+imports transitively, or — with the *Imported By* toggle — what imports it.
+Model (`JsonnetImportGraph`) is separate from the shell (`JsonnetImportGraphPanel`)
+and tested directly (12 tests: relative/jpath resolution, `importstr` kinds,
+unresolved/`tk`/directory imports, cycles, shared deps, vendor boundary, both
+directions, panel wiring).
+- **Resolution is shared with evaluation:** the rule moved out of
+  `VirtualFileImporter` into `TankaJpath.resolveImport`, so the view can't
+  disagree with what `import` really loads.
+- Tree over a graph, kept finite by: cycle → `CYCLE` leaf, already-expanded
+  file → `SEEN_ABOVE` leaf. `vendor/` is shown but not expanded (and vendored
+  importers omitted) unless *Expand vendor/* is on — k8s-libsonnet alone is
+  hundreds of files.
+- Builds off the EDT (`ReadAction.nonBlocking`, cancelled by the next refresh);
+  refreshes on focus change / toolbar, not on every keystroke.
+- **Not visually verified** (no `runIde`). Not a rendered diagram — see item 8.
 
 ### 8. Full `DiagramProvider`-based import graph
 The originally-scoped Phase 5 item, if item 7 turns out insufficient. Needs
 a session that can actually run `./gradlew runIde` and look at the result —
 don't attempt this blind again.
 
-### 9. Marketplace-readiness pass
-README, CHANGELOG, plugin description/screenshots, and a final pass over
-`plugin.xml` metadata (`<description>`, vendor info) — separate from feature
-work but named as part of Phase 4's original exit criterion ("ready for a
-JetBrains Marketplace listing") and never done. Low risk, low urgency until
-an actual listing is planned.
+### 9. ~~Marketplace-readiness pass~~ — DONE, except what needs a human
+Done: `README.md`, `CHANGELOG.md`, a full `plugin.xml` description and
+change-notes, `pluginIcon.svg`, `THIRD_PARTY_NOTICES.md` (licenses read from the
+shipped artifacts' own POMs, bundled into the jar under `META-INF/`), and
+`buildPlugin` produces a valid ~14MB zip. Every README/description claim was
+written against the code, including an explicit *Limitations* section.
+- **Found and fixed a real compatibility bug:** `plugin.xml` still declared
+  `<depends>com.intellij.java</depends>` from the Phase 0 spike though nothing
+  uses Java PSI, which would have made the plugin uninstallable in GoLand (where
+  most Tanka users are, presumably). Removed along with the matching
+  `bundledPlugin("com.intellij.java")`; all tests still pass.
+- **Still open before actually publishing — none of these are mine to decide:**
+  1. **A `LICENSE` for this project's own code.** None exists; README says so.
+  2. **Screenshots** (Preview, Imports, color page) — needs a running IDE.
+  3. **`./gradlew verifyPlugin` across the recommended IDEs** (GoLand, IU, …).
+     Dropping the Java dependency makes them plausible targets but they have
+     not been run; README states this.
+  4. Signing / `publishPlugin` credentials, and a `<vendor url>` if wanted.
 
 ---
 

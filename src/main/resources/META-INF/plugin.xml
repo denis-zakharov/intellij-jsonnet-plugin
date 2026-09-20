@@ -4,13 +4,43 @@
     <vendor email="dizaharov@gmail.com">dz</vendor>
 
     <description><![CDATA[
-        Native (non-LSP) IntelliJ support for Jsonnet and Tanka, built on a
-        PSI grammar and the embedded, shaded <a href="https://github.com/databricks/sjsonnet">sjsonnet</a>
-        evaluator — no external language server process.
+        <p>
+            Native (non-LSP) IntelliJ support for <b>Jsonnet</b> and <b>Tanka</b>, built on a real PSI
+            grammar and the embedded, shaded <a href="https://github.com/databricks/sjsonnet">sjsonnet</a>
+            evaluator &mdash; no external language server process.
+        </p>
+        <h3>Jsonnet editing</h3>
+        <ul>
+            <li>Syntax and semantic highlighting (locals, parameters, fields, <code>std</code> calls), with a Color Scheme page</li>
+            <li>Go to definition, find usages and rename for locals, parameters and fields; Go to Symbol across the project</li>
+            <li>Import paths resolve like Tanka does: relative to the file, then <code>main.jsonnet</code>'s directory, <code>vendor/</code> and <code>lib/</code></li>
+            <li>Completion and documentation for the standard library, Tanka's native functions and the <code>tk</code> module</li>
+            <li>Unresolved-reference errors (cross-checked against sjsonnet's own scope analysis), an unused local / hidden field inspection with quick fixes, parameter-name inlay hints</li>
+            <li>Formatter, folding, structure view, brace matching, commenting</li>
+        </ul>
+        <h3>Evaluation</h3>
+        <ul>
+            <li><b>Jsonnet Preview</b> tool window: live JSON or YAML output of the focused file, with ext vars and top-level arguments; Ctrl/Cmd+click an output line to jump to the source that produced it &mdash; sees unsaved editor buffers</li>
+            <li><b>Jsonnet Imports</b> tool window: what a file imports (transitively) or what imports it</li>
+            <li>Evaluate a selected expression in the context of the file's top-level locals</li>
+        </ul>
+        <h3>Tanka</h3>
+        <ul>
+            <li>New Tanka environment action, JSON Schema support for <code>spec.json</code> and <code>jsonnetfile.json</code>, environment icons</li>
+            <li>Run configurations and a gutter action for <code>jsonnet</code>/<code>tk show|diff|apply|export</code>, a side-by-side comparison of two environments' <code>tk show</code> output, and a <code>jb install</code> quick fix &mdash; these use your own <code>tk</code>, <code>jb</code> and <code>jsonnet</code> binaries and are optional</li>
+        </ul>
+        <p>
+            Everything else runs inside the IDE. Anything that needs Tanka's Go-injected native functions
+            (<code>parseYaml</code>, Helm, Kustomize, ...) can only be evaluated through <code>tk</code>.
+        </p>
     ]]></description>
 
+    <change-notes><![CDATA[
+        <p><b>0.1.0</b> &mdash; first release: Jsonnet language support, embedded evaluator with Preview and
+        import graph tool windows, and Tanka integration. See the CHANGELOG for details.</p>
+    ]]></change-notes>
+
     <depends>com.intellij.modules.platform</depends>
-    <depends>com.intellij.java</depends>
     <depends>com.intellij.modules.json</depends>
 
     <extensions defaultExtensionNs="com.intellij">
@@ -120,6 +150,11 @@
                     icon="/icons/jsonnet.svg"
                     factoryClass="com.dz.intellijjsonnet.editor.preview.JsonnetPreviewToolWindowFactory"/>
 
+        <toolWindow id="Jsonnet Imports"
+                    anchor="right"
+                    icon="/icons/jsonnet.svg"
+                    factoryClass="com.dz.intellijjsonnet.imports.JsonnetImportGraphToolWindowFactory"/>
+
         <configurationType implementation="com.dz.intellijjsonnet.editor.runconfig.JsonnetRunConfigurationType"/>
 
         <runLineMarkerContributor
@@ -132,6 +167,14 @@
                 class="com.dz.intellijjsonnet.editor.EvaluateJsonnetFileAction"
                 text="Open Jsonnet Preview"
                 description="Open the Jsonnet Preview tool window, evaluated with the embedded sjsonnet interpreter">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+
+        <action id="Jsonnet.ShowImportGraph"
+                class="com.dz.intellijjsonnet.imports.ShowJsonnetImportGraphAction"
+                text="Show Jsonnet Import Graph"
+                description="Open the Jsonnet Imports tool window: what this file imports, or what imports it">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>

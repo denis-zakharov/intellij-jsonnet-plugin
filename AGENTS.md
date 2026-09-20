@@ -230,6 +230,28 @@ ecosystem at all — see the plan doc).
 - macOS: `sed -i` needs `sed -i ''` — the bare form eats the script as the
   backup suffix and errors with "bad flag in substitute command".
 
+## Import graph / marketplace notes (TODO.md items 7, 9)
+
+- **Import resolution has one implementation: `TankaJpath.resolveImport`**, used
+  by both `VirtualFileImporter` (evaluation) and `JsonnetImportGraph` (the
+  Imports tool window). Change it there, not in either caller. It may return a
+  directory; the graph treats that as unresolved, the importer's `read` rejects it.
+- **`FileTypeIndex.getFiles` has no defined order** — it made a "Imported By"
+  test flaky (passed, then failed on a swapped pair). Anything that turns index
+  results into user-visible order or into a test assertion must sort them
+  (`JsonnetImportGraph` sorts by path).
+- **Light fixtures don't instantiate tool windows**, so
+  `ToolWindowManager.getToolWindow(id)` is null in `BasePlatformTestCase`; assert
+  registration via `ToolWindowEP.EP_NAME.extensionList` instead. Panels are
+  tested by constructing them directly and calling an `internal` synchronous
+  `refreshNow()`-style seam (the real path is async `ReadAction.nonBlocking`).
+- **Don't add `<depends>com.intellij.java</depends>`** (or `bundledPlugin` for it)
+  back: no code uses Java PSI, and it restricts installs to Java-capable IDEs,
+  excluding GoLand. It was a Phase 0 leftover.
+- `THIRD_PARTY_NOTICES.md` lists licenses copied from the resolved artifacts' POMs;
+  regenerate it (`./gradlew :shaded-sjsonnet:dependencies --configuration shaded`,
+  then read each POM's `<license>`) whenever the sjsonnet version changes.
+
 ## Grammar bugs hit and fixed (Jsonnet.bnf / Jsonnet.flex)
 
 The first three were caught by the `ParsingTestCase`-based tests in
