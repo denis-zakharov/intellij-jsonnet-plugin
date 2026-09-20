@@ -2,12 +2,13 @@ package com.dz.intellijjsonnet.lang.psi.reference
 
 import com.dz.intellijjsonnet.lang.psi.JsonnetArrayComprehension
 import com.dz.intellijjsonnet.lang.psi.JsonnetBind
-import com.dz.intellijjsonnet.lang.psi.JsonnetExpr
 import com.dz.intellijjsonnet.lang.psi.JsonnetField
 import com.dz.intellijjsonnet.lang.psi.JsonnetFunctionExpr
 import com.dz.intellijjsonnet.lang.psi.JsonnetLocalExpr
 import com.dz.intellijjsonnet.lang.psi.JsonnetObjectComprehension
 import com.dz.intellijjsonnet.lang.psi.JsonnetObjectLiteral
+import com.dz.intellijjsonnet.lang.psi.JsonnetForSpec
+import com.dz.intellijjsonnet.lang.psi.JsonnetParam
 import com.dz.intellijjsonnet.lang.psi.JsonnetParamList
 import com.dz.intellijjsonnet.lang.psi.JsonnetTypes
 import com.dz.intellijjsonnet.lang.psi.nameIdentifier
@@ -26,42 +27,51 @@ object JsonnetResolver {
     fun resolveLocalName(from: PsiElement, name: String): PsiElement? {
         var context: PsiElement? = from
         while (context != null) {
-            val parent = context.parent
-            when (parent) {
-                is JsonnetLocalExpr -> {
-                    parent.bindList.firstOrNull { it.nameIdentifier?.text == name }?.let { return it }
-                }
-                // `local f(x) = ...`-style function-sugar: `x` must resolve inside the body.
-                is JsonnetBind -> {
-                    parent.paramList?.paramList?.firstOrNull { it.nameIdentifier?.text == name }?.let { return it }
-                }
-                is JsonnetParamList -> {
-                    parent.paramList.firstOrNull { it.nameIdentifier?.text == name }?.let { return it }
-                }
-                is JsonnetFunctionExpr -> {
-                    parent.paramList?.paramList?.firstOrNull { it.nameIdentifier?.text == name }?.let { return it }
-                }
-                is JsonnetField -> {
-                    parent.paramList?.paramList?.firstOrNull { it.nameIdentifier?.text == name }?.let { return it }
-                }
-                is JsonnetArrayComprehension -> {
-                    parent.forSpecList.firstOrNull { it.nameIdentifier?.text == name }?.let { return it }
-                }
-                is JsonnetObjectComprehension -> {
-                    parent.forSpecList.firstOrNull { it.nameIdentifier?.text == name }?.let { return it }
-                    parent.objectLocalList.firstOrNull { it.bind?.nameIdentifier?.text == name }?.bind?.let { return it }
-                }
-                is JsonnetObjectLiteral -> {
-                    parent.objectMemberList?.objectLocalList
-                        ?.firstOrNull { it.bind?.nameIdentifier?.text == name }
-                        ?.bind
-                        ?.let { return it }
-                }
-                else -> {}
-            }
+            val parent = context.parent ?: return null
+            declarationsIntroducedBy(parent).firstOrNull { declaredName(it) == name }?.let { return it }
             context = parent
         }
         return null
+    }
+
+    /**
+     * Every local/param/loop-variable declaration visible from [from], innermost scope first and
+     * with shadowed names dropped — the candidate list for name completion.
+     */
+    fun visibleDeclarations(from: PsiElement): List<PsiElement> {
+        val seen = HashSet<String>()
+        val result = mutableListOf<PsiElement>()
+        var context: PsiElement? = from
+        while (context != null) {
+            val parent = context.parent ?: break
+            for (declaration in declarationsIntroducedBy(parent)) {
+                val name = declaredName(declaration) ?: continue
+                if (seen.add(name)) result.add(declaration)
+            }
+            context = parent
+        }
+        return result
+    }
+
+    fun declaredName(declaration: PsiElement): String? = when (declaration) {
+        is JsonnetBind -> declaration.nameIdentifier?.text
+        is JsonnetParam -> declaration.nameIdentifier?.text
+        is JsonnetForSpec -> declaration.nameIdentifier?.text
+        else -> null
+    }
+
+    /** The names [scope] brings into scope for its children (whether or not a given child is inside it). */
+    private fun declarationsIntroducedBy(scope: PsiElement): List<PsiElement> = when (scope) {
+        is JsonnetLocalExpr -> scope.bindList
+        // `local f(x) = ...`-style function-sugar: `x` must resolve inside the body.
+        is JsonnetBind -> scope.paramList?.paramList.orEmpty()
+        is JsonnetParamList -> scope.paramList
+        is JsonnetFunctionExpr -> scope.paramList?.paramList.orEmpty()
+        is JsonnetField -> scope.paramList?.paramList.orEmpty()
+        is JsonnetArrayComprehension -> scope.forSpecList
+        is JsonnetObjectComprehension -> scope.forSpecList + scope.objectLocalList.mapNotNull { it.bind }
+        is JsonnetObjectLiteral -> scope.objectMemberList?.objectLocalList.orEmpty().mapNotNull { it.bind }
+        else -> emptyList()
     }
 
     /** Direct field declarations (not comprehensions, not inherited via `+`) of [obj]. */
@@ -96,14 +106,7 @@ object JsonnetResolver {
     fun enclosingObjectLiteral(from: PsiElement): JsonnetObjectLiteral? =
         PsiTreeUtil.getParentOfType(from, JsonnetObjectLiteral::class.java)
 
-    /** The document's root object literal (unwrapping leading top-level `local`s), for `$.foo`. */
-    fun rootObjectLiteral(from: PsiElement): JsonnetObjectLiteral? {
-        val file = from.containingFile ?: return null
-        var expr = PsiTreeUtil.findChildOfType(file, JsonnetExpr::class.java) ?: return null
-        while (true) {
-            val local = PsiTreeUtil.getChildOfType(expr, JsonnetLocalExpr::class.java) ?: break
-            expr = local.expr ?: return null
-        }
-        return PsiTreeUtil.getChildOfType(expr, JsonnetObjectLiteral::class.java)
-    }
+    /** Outermost object literal enclosing [from], for `$` — Jsonnet defines `$` that way, not as "the file's root object". */
+    fun outermostObjectLiteral(from: PsiElement): JsonnetObjectLiteral? =
+        PsiTreeUtil.getTopmostParentOfType(from, JsonnetObjectLiteral::class.java)
 }

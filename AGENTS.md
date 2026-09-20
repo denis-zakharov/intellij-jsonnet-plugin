@@ -232,6 +232,32 @@ ecosystem at all — see the plan doc).
 - macOS: `sed -i` needs `sed -i ''` — the bare form eats the script as the
   backup suffix and errors with "bad flag in substitute command".
 
+## Navigation / completion (member resolution)
+
+- **Member access is resolved by `lang/psi/reference/JsonnetStaticValues.kt`**, a PSI-only
+  best-effort evaluator (value = object literals + callable bodies), not a type system. The Expr PSI
+  is *flat* (`a.b(c) + d.e` is one `Expr` with children `a`, `.b`, `(c)`, `+`, `d`, `.e`), so the
+  receiver of a suffix is "its operand's atom + suffixes up to it" — `split()` builds operands.
+  Empty means *unknown*, never "no such member". `JsonnetFieldReference` (resolve + completion
+  variants) and `JsonnetLocalReference.getVariants` are the only consumers; completion is
+  `getVariants()` on the references, plus `JsonnetKeywordCompletionContributor` for keywords/`std`.
+- `$` is the *outermost enclosing* object literal (`JsonnetResolver.outermostObjectLiteral`), not
+  the file's root object. `JsonnetFieldReference` is poly-variant: `(a + b).x` resolves to both, so
+  renaming one over-approximates onto the other's uses — accepted.
+- **Import path references used to be dead.** They were registered as a `PsiReferenceContributor`
+  on the `STRING` *leaf*, and a bare leaf never asks reference contributors for references —
+  `findReferenceAt` returned null, so go-to-definition and path completion never worked and nothing
+  tested it. Fix: `JsonnetImportExpr` (mixin) hosts the `FileReferenceSet` (`getReferences()`),
+  with a `JsonnetImportExprManipulator` so file rename/move can rewrite the path. **Lesson: a
+  reference contributor only fires on elements whose `getReferences()` delegates to the registry —
+  never on plain token leaves. Test any new reference with `findReferenceAt` at the caret.**
+- `ResolveCache` isn't available in `ParsingTestCase`'s mock project; `JsonnetFieldReference`
+  falls back to uncached resolution when `ResolveCache.getInstance` is null.
+- Known gap, pre-existing: `JsonnetUnusedDeclarationUtil.isUnusedHiddenField` only searches the
+  field's own object, but in Tanka libraries hidden fields (`new():: ...`) are the public API used
+  from other files — expect false positives there. Fixing it means searching usages project-wide
+  (now possible via the cross-file resolution above).
+
 ## Import graph / marketplace notes (TODO.md items 7, 9)
 
 - **Import resolution has one implementation: `TankaJpath.resolveImport`**, used

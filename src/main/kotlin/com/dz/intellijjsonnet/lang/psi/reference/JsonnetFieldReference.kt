@@ -2,49 +2,39 @@ package com.dz.intellijjsonnet.lang.psi.reference
 
 import com.dz.intellijjsonnet.lang.psi.JsonnetDotSuffix
 import com.dz.intellijjsonnet.lang.psi.JsonnetElementFactory
-import com.dz.intellijjsonnet.lang.psi.JsonnetExpr
-import com.dz.intellijjsonnet.lang.psi.JsonnetTypes
 import com.dz.intellijjsonnet.lang.psi.nameIdentifier
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementResolveResult
 import com.intellij.psi.PsiPolyVariantReferenceBase
 import com.intellij.psi.ResolveResult
-import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.impl.source.resolve.ResolveCache
 
 /**
- * Resolves the narrow, statically-decidable case of `self.foo` / `$.foo` (this
- * [dotSuffix] is the first/only suffix directly after a bare `self`/`$`) to the
- * matching field declared directly in the relevant object literal. Anything
- * requiring type-directed lookup (chained access, `super.foo`, fields reached
- * through composition/imports) is out of scope for this phase.
+ * Resolves `receiver.foo` to the field(s) named `foo` declared in whatever object(s) the receiver
+ * statically is — see [JsonnetStaticValues] for what "statically" covers (locals, imports, `self`/`super`/`$`,
+ * `+`/`{...}` composition, calls of source-defined functions). Several results are possible
+ * (`(a + b).foo` where both declare it), hence poly-variant.
  */
 class JsonnetFieldReference(element: JsonnetDotSuffix) : PsiPolyVariantReferenceBase<JsonnetDotSuffix>(element) {
 
-    override fun multiResolve(incompleteCode: Boolean): Array<ResolveResult> {
-        val name = element.nameIdentifier?.text ?: return ResolveResult.EMPTY_ARRAY
-        val receiver = receiverKeyword() ?: return ResolveResult.EMPTY_ARRAY
-        val obj = when (receiver) {
-            JsonnetTypes.SELF_KW -> JsonnetResolver.enclosingObjectLiteral(element)
-            JsonnetTypes.DOLLAR -> JsonnetResolver.rootObjectLiteral(element)
-            else -> null
-        } ?: return ResolveResult.EMPTY_ARRAY
+    // Cached because annotators, inlay hints and inspections all resolve the same suffixes, and a
+    // resolve can walk through several imported files. The light `ParsingTestCase` project has no
+    // ResolveCache service (see AGENTS.md), hence the uncached fallback.
+    override fun multiResolve(incompleteCode: Boolean): Array<ResolveResult> =
+        ResolveCache.getInstance(element.project)?.resolveWithCaching(this, Resolver, false, incompleteCode)
+            ?: resolveUncached()
 
-        val field = JsonnetResolver.directFields(obj).firstOrNull { JsonnetResolver.fieldNameText(it) == name }
-            ?: return ResolveResult.EMPTY_ARRAY
-        return arrayOf(PsiElementResolveResult(field))
+    private fun resolveUncached(): Array<ResolveResult> {
+        val name = element.nameIdentifier?.text ?: return ResolveResult.EMPTY_ARRAY
+        return JsonnetStaticValues.receiverOf(element).fieldsNamed(name)
+            .map { PsiElementResolveResult(it) }
+            .toTypedArray()
     }
 
-    /** The `self`/`$` token immediately preceding this suffix in its Expr, if any. */
-    private fun receiverKeyword(): com.intellij.psi.tree.IElementType? {
-        val exprParent = element.parent as? JsonnetExpr ?: return null
-        var prev: PsiElement? = element.prevSibling
-        while (prev != null && prev.node.elementType == com.intellij.psi.TokenType.WHITE_SPACE) {
-            prev = prev.prevSibling
-        }
-        if (prev == null || prev.parent != exprParent) return null
-        val type = prev.node.elementType
-        return if (type == JsonnetTypes.SELF_KW || type == JsonnetTypes.DOLLAR) type else null
+    private object Resolver : ResolveCache.PolyVariantResolver<JsonnetFieldReference> {
+        override fun resolve(ref: JsonnetFieldReference, incompleteCode: Boolean): Array<ResolveResult> =
+            ref.resolveUncached()
     }
 
     override fun handleElementRename(newElementName: String): PsiElement {
@@ -52,7 +42,17 @@ class JsonnetFieldReference(element: JsonnetDotSuffix) : PsiPolyVariantReference
         return element
     }
 
-    override fun getVariants(): Array<Any> = emptyArray()
+    /** Field names of the receiver, for completion — `std.` and `tk.` members come from their own contributors. */
+    override fun getVariants(): Array<Any> {
+        val seen = HashSet<String>()
+        return JsonnetStaticValues.receiverOf(element).fields
+            .filter { field ->
+                val name = JsonnetResolver.fieldNameText(field)
+                name != null && JsonnetLookupElements.isPlainIdentifier(name) && seen.add(name)
+            }
+            .map { JsonnetLookupElements.forField(it) }
+            .toTypedArray()
+    }
 
     // No ElementManipulator is registered for JsonnetDotSuffixImpl, and the
     // default range (the whole `.foo` suffix, including the dot) would be

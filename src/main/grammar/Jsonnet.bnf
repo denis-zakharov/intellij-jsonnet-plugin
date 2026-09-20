@@ -180,8 +180,10 @@ functionExpr ::= FUNCTION_KW paramList expr {
   pin=1
 }
 
+// The mixin hosts the path's file references: a bare STRING token can't (see JsonnetImportReferences).
 importExpr ::= (IMPORT_KW | IMPORTSTR_KW | IMPORTBIN_KW) STRING {
   pin=1
+  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetImportExprMixin"
 }
 
 assertExpr ::= ASSERT_KW expr (COLON expr)? SEMI expr {

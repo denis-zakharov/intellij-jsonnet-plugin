@@ -40,5 +40,7 @@ class JsonnetLocalReference(element: JsonnetNameRef) : PsiPolyVariantReferenceBa
         return element
     }
 
-    override fun getVariants(): Array<Any> = emptyArray()
+    /** Every local/param/loop variable visible here; keywords and `std` come from [JsonnetKeywordCompletionContributor]. */
+    override fun getVariants(): Array<Any> =
+        JsonnetResolver.visibleDeclarations(element).mapNotNull { JsonnetLookupElements.forDeclaration(it) }.toTypedArray()
 }

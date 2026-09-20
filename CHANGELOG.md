@@ -14,9 +14,15 @@ First release.
   Color Scheme settings page for all of it.
 - Resolution for locals, parameters and fields: go to definition, find usages, rename; Go to Symbol
   backed by a stub index (files under `vendor/` are deliberately not indexed).
+- Member access resolves statically through imports, `local` bindings, `self` / `super` / `$`,
+  `+` and `expr { ... }` composition (including `field+:`), string indexes and calls of functions
+  defined in source: `lib.util.helper`, `deployment.new(...).spec` and so on navigate to the declaration.
 - Import path references resolving relative to the file, then Tanka's jpath
-  (`main.jsonnet` directory, `vendor/`, `lib/`).
-- Completion and documentation for `std`, Tanka's native functions and the `tk` module.
+  (`main.jsonnet` directory, `vendor/`, `lib/`): go to definition, path completion, and file
+  renames/moves update the path.
+- Completion for locals, parameters, loop variables, keywords, `std`, and object fields after `.`
+  (auto-popup on `.`); completion and documentation for `std`, Tanka's native functions and the
+  `tk` module.
 - Unresolved-reference errors, cross-checked against sjsonnet's own scope analysis; an "unused local
   or hidden field" inspection with quick fixes; parameter-name inlay hints.
 - Formatter, code folding, structure view, brace matching, commenter.
