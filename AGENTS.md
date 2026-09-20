@@ -155,6 +155,53 @@ ecosystem at all — see the plan doc).
   `.updated(k, v)`), and pulling constructor defaults via backtick-escaped
   static methods (`` Interpreter.`$lessinit$greater$default$N`() ``). Copy
   this pattern rather than re-deriving it.
+- **Unresolved-variable detection happens in `CachedResolver.parse()`, not in
+  a later `StaticOptimizer.optimize()` call** — TODO.md item 3's spike
+  (`SjsonnetStaticCheck.kt`) confirmed this the hard way: `StaticOptimizer`'s
+  class file does contain the string `"Unknown variable: \u0001"` (found via
+  `javap -v` grepping the constant pool for `variable`), which is what
+  originally suggested `optimize()` was the right call to wrap in a
+  try/catch — but calling it on a tree with a genuinely-undefined name
+  **doesn't throw**; `parse()` itself already returns `Left(a sjsonnet.Error)`
+  before `optimize()` is ever reached, because slot-index resolution
+  (`Expr.Id` → `Expr.ValidId`) has to happen eagerly at parse time (the
+  interpreter's variable environment is slot/array-indexed, not name-keyed,
+  so an index has to exist for every reference, unresolved or not — laziness
+  only defers *evaluation*, not this). Confirmed by writing the *use* case
+  first (`SjsonnetStaticCheck.kt`'s own unit tests) rather than trusting the
+  string-search alone — two of the seven tests failed on the first run
+  (`optimize()` never threw), which is what surfaced this. **Lesson, same
+  shape as the `StdLibRegistrySanityTest`/resolver-bug lessons above: a
+  promising string found via `javap` names *where a message lives*, not
+  necessarily *when it fires* — write the actual call and a failing-case
+  test before trusting the theory.** `parse()`'s `Left` also carries real
+  `ParseError`s (genuine syntax errors) through the exact same channel —
+  distinguish by type (`error is ParseError` → skip, that's not what you
+  want) or you'll double-report syntax errors the PSI parser already flags.
+- **`Interpreter` already exposes everything needed to run sjsonnet's real
+  static analysis standalone** — `resolver()`, `evaluator()`,
+  `createOptimizer(EvalScope, Val$Obj, HashMap, HashMap)`,
+  `internedStrings()`, `internedStaticFieldSets()` are all public. No need to
+  hand-assemble an `EvalScope`/`std` from scratch; just build an `Interpreter`
+  the same way `JsonnetEngine` already does (with `Importer.empty()` — import
+  boundaries don't leak names into a file's lexical scope in Jsonnet, so
+  variable-resolution checking needs no real importer) and pull these off it.
+  `sjsonnet.Error` (base of `StaticError`/`ParseError`) `extends
+  java.lang.Exception` and carries `.stack(): List<Error$Frame>`, each frame
+  exposing `.pos(): Position` → `.offset(): Int`, a plain character offset
+  into the source string — maps directly onto a PSI `TextRange` with no
+  line/column math, since both sjsonnet and our own parser consume the exact
+  same source string.
+- **`StaticOptimizer.optimize()` is still fail-fast even though it turned out
+  not to be the trigger point here**: `StaticError.fail(...)` is a Scala
+  `Nothing`-returning throw, so any single parse-or-optimize pass reports at
+  most one unresolved name, never all of them. This is why
+  `JsonnetUnresolvedReferenceAnnotator` still uses the hand-rolled
+  `JsonnetResolver` PSI walk as its *primary*, complete source of "which
+  identifiers are unresolved," with `SjsonnetStaticCheck`'s real-sjsonnet
+  result (cached per file via `CachedValuesManager` — it reparses the whole
+  file, too expensive to redo per identifier) layered on top only to catch
+  cases the hand-rolled walk's own logic might miss.
 
 ## Grammar bugs hit and fixed (Jsonnet.bnf / Jsonnet.flex)
 

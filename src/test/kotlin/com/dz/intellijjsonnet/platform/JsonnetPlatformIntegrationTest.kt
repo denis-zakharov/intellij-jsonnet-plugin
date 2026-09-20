@@ -149,4 +149,38 @@ class JsonnetPlatformIntegrationTest : BasePlatformTestCase() {
         )
         assertEquals("\"Hello, World!\"", (result as JsonnetEngine.Result.Success).json)
     }
+
+    // --- JsonnetUnresolvedReferenceAnnotator (Phase 2) + SjsonnetStaticCheck cross-check (TODO.md item 3) ---
+
+    private fun errorRanges(): List<com.intellij.openapi.util.TextRange> =
+        myFixture.doHighlighting()
+            .filter { it.severity == com.intellij.lang.annotation.HighlightSeverity.ERROR }
+            .map { com.intellij.openapi.util.TextRange(it.startOffset, it.endOffset) }
+
+    fun `test resolved identifier is not flagged`() {
+        myFixture.configureByText("a.jsonnet", "local x = 1; { a: x, b: x + 1 }")
+        assertEquals(emptyList<com.intellij.openapi.util.TextRange>(), errorRanges())
+    }
+
+    fun `test std is never flagged even though it has no declaration`() {
+        myFixture.configureByText("a.jsonnet", "std.length([1, 2, 3])")
+        assertEquals(emptyList<com.intellij.openapi.util.TextRange>(), errorRanges())
+    }
+
+    fun `test genuinely unresolved identifier is flagged exactly once`() {
+        val text = "local x = 1; x + totallyUndefined"
+        myFixture.configureByText("a.jsonnet", text)
+        val errors = errorRanges()
+        assertEquals(1, errors.size)
+        assertEquals("totallyUndefined", text.substring(errors.single().startOffset, errors.single().endOffset))
+    }
+
+    fun `test function-sugar bind parameter is not flagged inside its own body`() {
+        // Locks in the JsonnetResolver.resolveLocalName fix (see AGENTS.md's
+        // Resolver bugs section) at the full annotator-integration level, not
+        // just the unit-test level: this used to render as a false "unresolved
+        // reference" error on every use of the single most common Jsonnet idiom.
+        myFixture.configureByText("a.jsonnet", "local f(x) = x + 1; f(2)")
+        assertEquals(emptyList<com.intellij.openapi.util.TextRange>(), errorRanges())
+    }
 }

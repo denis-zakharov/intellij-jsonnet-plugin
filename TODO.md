@@ -79,23 +79,43 @@ one-liner clone command).
   the bugs no amount of hand-written fixture text will — worth doing again
   whenever the grammar changes substantially.**
 
-### 3. Wire sjsonnet's own `StaticOptimizer` for unresolved-reference diagnostics
-`JsonnetUnresolvedReferenceAnnotator` currently sources "is this identifier
-resolved" from the plugin's own hand-rolled `JsonnetResolver` lexical-scope
-walk (Phase 1), not from sjsonnet's actual static analysis — noted as a
-follow-up since Phase 2 and never revisited. The plan's own §4.4 rationale
-("reuse sjsonnet's own semantics... so diagnostics are guaranteed consistent
-with what a full evaluation would report") isn't actually true yet for this
-specific diagnostic.
-- **Why P0-adjacent:** a hand-rolled resolver can diverge from real Jsonnet
-  scoping rules in edge cases (the same class of risk that produced the
-  Phase 5 `JsonnetResolver.resolveLocalName` object-local bug — see
-  AGENTS.md). Every other "correctness" surface in the plugin (evaluation,
-  go-to-definition targets) already defers to sjsonnet; this one doesn't.
-- **Where to start:** confirm via `javap` (same technique as the native-fn
-  and stub-index investigations) whether `sjsonnet`'s `StaticOptimizer`/
-  `Scope` classes expose anything usable from Kotlin before assuming it's
-  wireable — this was never actually spiked, only deferred.
+### 3. ~~Wire sjsonnet's own static analysis for unresolved-reference diagnostics~~ — DONE
+Spiked via `javap` on `sjsonnet_3-0.7.4.jar` and wired up. `Interpreter`
+already exposes `resolver()`, `evaluator()`, `createOptimizer(...)`,
+`internedStrings()`, `internedStaticFieldSets()` as public accessors — no
+manual `EvalScope`/`std` assembly needed, just build an `Interpreter` the
+same way `JsonnetEngine` already does. New standalone, independently unit
+tested `SjsonnetStaticCheck.firstUnresolvedVariable(fileName, source)`
+(`engine/SjsonnetStaticCheck.kt`) runs the real sjsonnet name-resolution
+pass and returns the first unresolved name's source offset + message, or
+`null`.
+- **Correction to the original plan, found by testing the actual behavior
+  and not just the `javap` signatures:** unresolved-variable detection
+  happens in `CachedResolver.parse()` (returned as `Left(a sjsonnet.Error)`),
+  not in a separate later `StaticOptimizer.optimize()` call — the
+  `"Unknown variable: ..."` string found via `javap -v`'s constant-pool grep
+  does live in `StaticOptimizer.class`, but that's where the message *text*
+  lives, not where it actually *fires*; calling `optimize()` on a tree with
+  a genuinely-undefined name doesn't throw. Two of seven tests failed on the
+  first real run before this was caught. `parse()`'s `Left` also carries
+  genuine `ParseError`s (real syntax errors) through the same channel —
+  filtered out by type so this never double-reports what the PSI parser
+  already flags.
+- **`JsonnetUnresolvedReferenceAnnotator` now cross-checks every identifier
+  against `SjsonnetStaticCheck`** (cached per file via `CachedValuesManager`
+  — the check reparses the whole file, too expensive per-identifier) in
+  addition to its existing `JsonnetResolver` PSI walk, and flags anything
+  sjsonnet's real analysis catches that the hand-rolled walk misses. This is
+  additive, not a replacement: `StaticOptimizer`/`CachedResolver.parse()`'s
+  unresolved-name check is fail-fast (`StaticError.fail` is a Scala
+  `Nothing`-returning throw), so a single pass can only ever report the
+  *first* divergence in a file — it can't stand in as the sole, complete
+  source of "every unresolved identifier here" the way the per-element PSI
+  walk can, but it closes real trust gaps the hand-rolled walk might have.
+  4 new `BasePlatformTestCase` tests lock in the end-to-end annotator
+  behavior (including a regression guard for the `local f(x) = x + 1;`
+  resolver bug fixed in item 1, now double-covered at both the unit and
+  annotator-integration level).
 
 ---
 
