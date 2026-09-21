@@ -267,13 +267,38 @@ where there is one (`regexMatch`, `regexSubst`, `escapeStringRegex`), with the c
   mutation-checked), `SjsonnetOnlyStdTest` (every entry is still a sjsonnet member and
   really evaluates in the preview).
 
-### 13. Re-check the "no tracing/debug hook" premise
-The "Explicitly not planned" debugger entry rested on the same shallow public-API
-inspection that wrongly ruled out native functions. `SjsonnetMainBase.mainConfigured`
-takes a `DebugStats` and an `Option[Evaluator]`, and `Interpreter` takes a logger
-and `storePos`; whether any of that is a usable evaluation-tracing hook is
-unchecked. Spend a probe (write the call, don't just read `javap`) before
-treating step-through as impossible.
+### 13. ~~Re-check the "no tracing/debug hook" premise~~ — DONE: the premise was wrong
+There **is** a usable hook, found by writing the call rather than reading `javap`.
+`Interpreter` and `Evaluator` are non-final, `Interpreter.createEvaluator(...)` is
+public, and `Evaluator.visitExpr(Expr, Eval[])` — the evaluator's central dispatcher,
+the same place sjsonnet's own `Profiler` hooks in — is public and non-final. A subclass
+returning its own `Evaluator` sees every dispatched expression: no reflection, no
+patched sjsonnet. `SjsonnetTracingHookTest` is the working example (and the
+regression guard: a sjsonnet bump that closes this fails it; mutation-checked).
+Verified by running it:
+- Each event carries `Expr.pos()` → `currentFile()` + `offset()`, including code in
+  imported files and the `Import` expression itself (in-memory importer, two files).
+- The hook runs on the evaluating thread, so blocking there *is* a breakpoint: the
+  worker parked in `visitExpr`, another thread inspected it, released it, and the
+  result was still correct.
+- At a pause the `Eval[]` scope array holds the live values (an argument `21` showed up
+  as a `Val.Num`); forcing them from the hook worked.
+- On a realistic Tanka-style program (functions, `if`, comprehensions, `std.foldl` with
+  a lambda, `+` mixins, `self`) every line that does work fired.
+Limits found, not yet worked around:
+- **Not every expression goes through `visitExpr`.** Eager/pure-arithmetic fast paths
+  (`x * 2` on plain numbers, a plain-variable argument, `i + 1` in a comprehension) and
+  the static optimizer's constant folding (`std.length("abc")`) skip it. There is no
+  `Settings` switch; `StaticOptimizer` is open (`createOptimizer` is public) so folding
+  could be neutered, the private fast paths can't. A breakpoint on such a sub-expression
+  wouldn't fire; on a function body, field or call it does.
+- Some expressions have synthetic positions (`offset() == -1`); skip them.
+- Slots have no names. Mapping `Eval[]` indices to variable names means reading them
+  off the parsed AST (`ValidId` carries name and slot index) — not tried.
+- Order is demand-driven (lazy), so "step" follows forcing, not source order — the same
+  chain sjsonnet's own error stack shows.
+- Evaluation still runs on the EDT (see item 4); pausing needs a background thread.
+Not built. What it would take is in the "not planned" entry below.
 
 ---
 
@@ -287,10 +312,14 @@ treating step-through as impossible.
 - **`helmTemplate` / `kustomizeBuild` natives on the JVM** — they shell out to
   external binaries even inside real Tanka, so a JVM version would just be a
   worse `tk`. (Tanka's *pure* natives are done — item 10.)
-- **Real breakpoint/step-through debugging into `sjsonnet`** — no public hook
-  found, **but see item 13: that check was shallow.** `EvaluateJsonnetExpressionAction`
-  (Phase 5) is the honest substitute. Revisit only if `sjsonnet` ever exposes
-  an evaluation-tracing API.
+- **Real breakpoint/step-through debugging into `sjsonnet`** — the premise that
+  made this impossible ("no public hook") was wrong; see item 13, where the hook is
+  probed and pinned by `SjsonnetTracingHookTest`. Still not built, and it's a phase of
+  its own: an `XDebugProcess`/run configuration, a breakpoint type mapped to
+  `Position`s, a suspend/resume protocol (the pausing mechanics are the easy part),
+  variable names for the scope view, evaluation off the EDT, and living with the
+  fast-path gaps above. `EvaluateJsonnetExpressionAction` (Phase 5) remains the
+  substitute. Revisit if step-through becomes a priority.
 - **Inferred merge-result inlay hints on composed objects** — dropped as
   fundamentally imprecise without full evaluation (computed field names,
   imports, and comprehensions all defeat static inference). The Preview tool

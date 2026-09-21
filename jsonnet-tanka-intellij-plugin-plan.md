@@ -602,6 +602,12 @@ a tracked checklist.
     argues against. A real debugger integration (`XDebuggerManager`, a
     breakpoint type, a suspend/step protocol against an interpreter that
     supports none of that) is a phase of its own, not a Phase 5 line item.
+    **Correction (TODO.md item 13):** the "no hook" finding above was wrong —
+    `Interpreter.createEvaluator` and `Evaluator.visitExpr` are public and
+    non-final, so a plain subclass sees every dispatched expression (file,
+    offset, live scope) on the evaluating thread, without reflection. Probed and
+    pinned by `SjsonnetTracingHookTest`; a real debugger is still a phase of
+    its own, but it is no longer blocked on the engine.
   - **Cross-environment diff** (`tanka/CompareTankaEnvironmentsAction.kt`,
     `tanka/TankaEnvironments.kt`): right-click on (or inside) an
     `environments/<name>/main.jsonnet`, pick another discovered environment,
