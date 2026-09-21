@@ -13,9 +13,11 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
@@ -45,6 +47,11 @@ import javax.swing.JPanel
  * on an output line jumps to the source expression that produced that value
  * (possibly in an imported file) — see [PreviewOutputPaths] and
  * [io.github.denis_zakharov.jsonnettanka.engine.SourceLocator].
+ *
+ * Evaluation runs on a pooled thread, never on the EDT (a big Tanka environment can take seconds).
+ * At most one evaluation is in flight; a refresh requested meanwhile is coalesced into a single
+ * re-run once it finishes, and the finished (now stale) result is dropped instead of shown.
+ * The previous output stays on screen until the new one is ready.
  */
 class JsonnetPreviewPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
 
@@ -65,6 +72,18 @@ class JsonnetPreviewPanel(private val project: Project) : JPanel(BorderLayout())
     /** A file we just opened ourselves via click-jump: its selection event must not re-target Preview at it. */
     private var jumpTarget: VirtualFile? = null
 
+    private val status = JBLabel(IDLE_STATUS).apply { border = JBUI.Borders.empty(2, 6) }
+
+    /** EDT-only. True from the moment an evaluation is dispatched until its result (or its drop) is handled on the EDT. */
+    internal var evaluating = false
+        private set
+
+    /** EDT-only. A refresh arrived while [evaluating]: the in-flight result is stale, re-run instead of showing it. */
+    private var rerunRequested = false
+
+    @Volatile
+    private var disposed = false
+
     init {
         val header = JPanel(GridLayout(1, 2, JBUI.scale(8), 0))
         header.add(labeled("ext vars (name=string, name:=code):", extVarsField))
@@ -80,6 +99,7 @@ class JsonnetPreviewPanel(private val project: Project) : JPanel(BorderLayout())
 
         add(header, BorderLayout.NORTH)
         add(JBScrollPane(output), BorderLayout.CENTER)
+        add(status, BorderLayout.SOUTH)
 
         val actionGroup = DefaultActionGroup()
         actionGroup.add(object : AnAction("Refresh", "Re-evaluate the current file", com.intellij.icons.AllIcons.Actions.Refresh) {
@@ -162,26 +182,64 @@ class JsonnetPreviewPanel(private val project: Project) : JPanel(BorderLayout())
         get() = yamlOutput
         set(value) { yamlOutput = value }
 
+    /** Re-evaluates the focused file off the EDT. Call on the EDT; the output updates when the evaluation finishes. */
     fun refresh() {
-        lastSuccess = null
-        val file = currentFile ?: run {
+        if (currentFile == null) {
+            lastSuccess = null
             output.text = "(no Jsonnet file focused)"
             return
         }
+        if (evaluating) {
+            rerunRequested = true
+            return
+        }
+        startEvaluation()
+    }
+
+    private fun startEvaluation() {
+        val file = currentFile ?: return
+        // Everything the evaluation depends on is read here, on the EDT, so it sees one consistent snapshot.
         val format = if (yamlOutput) JsonnetEngine.OutputFormat.YAML else JsonnetEngine.OutputFormat.JSON
-        val result = JsonnetEngine.evaluateFile(
-            file,
-            extVars = PreviewVars.parse(extVarsField.text),
-            tlaVars = PreviewVars.parse(tlaVarsField.text),
-            format = format,
-        )
+        val extVars = PreviewVars.parse(extVarsField.text)
+        val tlaVars = PreviewVars.parse(tlaVarsField.text)
+
+        evaluating = true
+        rerunRequested = false
+        status.text = "Evaluating…"
+
+        // Deliberately not `ReadAction.nonBlocking`: sjsonnet never checks for cancellation, so a
+        // read action held for the whole evaluation would block the next keystroke's write action.
+        // `VirtualFileText.read` takes its own short read action per file instead.
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val result = try {
+                JsonnetEngine.evaluateFile(file, extVars, tlaVars, format)
+            } catch (t: Throwable) {
+                // Without this the panel would stay in "evaluating" forever (and refuse every later refresh).
+                LOG.warn("Preview evaluation crashed", t)
+                JsonnetEngine.Result.Failure("Evaluation crashed: $t")
+            }
+            ApplicationManager.getApplication().invokeLater({ finishEvaluation(format, result) }, ModalityState.any())
+        }
+    }
+
+    private fun finishEvaluation(format: JsonnetEngine.OutputFormat, result: JsonnetEngine.Result) {
+        if (disposed) return
+        evaluating = false
+        status.text = IDLE_STATUS
+        if (rerunRequested) {
+            startEvaluation()
+            return
+        }
         output.text = when (result) {
             is JsonnetEngine.Result.Success -> {
                 lastSuccess = result
                 lastFormat = format
                 result.output
             }
-            is JsonnetEngine.Result.Failure -> "Evaluation failed:\n${result.message}"
+            is JsonnetEngine.Result.Failure -> {
+                lastSuccess = null
+                "Evaluation failed:\n${result.message}"
+            }
         }
         output.caretPosition = 0
     }
@@ -213,5 +271,14 @@ class JsonnetPreviewPanel(private val project: Project) : JPanel(BorderLayout())
         // Alarm and document listeners were registered with `this` as their
         // parent Disposable, so they're torn down automatically once
         // Disposer.dispose(this) runs (see JsonnetPreviewToolWindowFactory).
+        // An evaluation still running on a pooled thread can't be stopped; just drop its result.
+        disposed = true
+    }
+
+    private companion object {
+        val LOG = Logger.getInstance(JsonnetPreviewPanel::class.java)
+
+        /** Non-breaking space, not "": keeps the status bar's height constant so the layout doesn't jump. */
+        const val IDLE_STATUS = "\u00A0"
     }
 }

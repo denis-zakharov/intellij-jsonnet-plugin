@@ -13,6 +13,7 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.stubs.StubIndex
+import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 /**
@@ -204,7 +205,18 @@ class JsonnetPlatformIntegrationTest : BasePlatformTestCase() {
         myFixture.configureByText(fileName, text)
         val panel = io.github.denis_zakharov.jsonnettanka.editor.preview.JsonnetPreviewPanel(project)
         com.intellij.openapi.util.Disposer.register(testRootDisposable, panel)
+        awaitPreview(panel)
         return panel
+    }
+
+    /** Preview evaluates off the EDT and publishes on it, so the test (on the EDT) has to pump events until it's done. */
+    private fun awaitPreview(panel: io.github.denis_zakharov.jsonnettanka.editor.preview.JsonnetPreviewPanel) {
+        val deadline = System.currentTimeMillis() + 30_000
+        while (panel.evaluating) {
+            assertTrue("preview evaluation did not finish", System.currentTimeMillis() < deadline)
+            PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+            Thread.sleep(5)
+        }
     }
 
     fun `test preview panel renders the focused file and jumps to the source of a clicked line`() {
@@ -223,6 +235,7 @@ class JsonnetPlatformIntegrationTest : BasePlatformTestCase() {
         val panel = previewPanelFor("main.jsonnet", text)
         panel.yamlEnabled = true
         panel.refresh()
+        awaitPreview(panel)
         val output = panel.outputText
         assertTrue("expected YAML, got: $output", output.contains("list:") && output.contains("- 20"))
 
@@ -240,6 +253,46 @@ class JsonnetPlatformIntegrationTest : BasePlatformTestCase() {
         assertEquals(lib.virtualFile, editorManager.selectedEditor?.file)
         assertEquals("{ leaf: 7 }".indexOf("7"), editorManager.selectedTextEditor?.caretModel?.offset)
         assertEquals("preview must keep showing main.jsonnet's output", before, panel.outputText)
+    }
+
+    fun `test preview refresh returns before the evaluation finishes`() {
+        val panel = previewPanelFor("main.jsonnet", "1")
+        val shown = panel.outputText
+        val main = myFixture.file.virtualFile
+        setUnsavedText(main, "2")
+
+        panel.refresh()
+        // The result can only be published by an EDT event, and this test is holding the EDT.
+        assertTrue("refresh() must not block on the evaluation", panel.evaluating)
+        assertEquals("the previous output stays until the new one is ready", shown, panel.outputText)
+
+        awaitPreview(panel)
+        assertEquals("2", panel.outputText.trim())
+    }
+
+    fun `test preview refreshes requested during an evaluation collapse into one re-run showing the latest text`() {
+        val panel = previewPanelFor("main.jsonnet", "1")
+        val main = myFixture.file.virtualFile
+
+        setUnsavedText(main, "2")
+        panel.refresh()
+        setUnsavedText(main, "3")
+        panel.refresh() // arrives while the first is in flight
+        setUnsavedText(main, "4")
+        panel.refresh()
+
+        awaitPreview(panel)
+        assertEquals("a stale result must never be what stays on screen", "4", panel.outputText.trim())
+    }
+
+    fun `test preview shows an evaluation failure and then recovers`() {
+        val panel = previewPanelFor("main.jsonnet", "error 'boom'")
+        assertTrue(panel.outputText, panel.outputText.startsWith("Evaluation failed:"))
+
+        setUnsavedText(myFixture.file.virtualFile, "5")
+        panel.refresh()
+        awaitPreview(panel)
+        assertEquals("5", panel.outputText.trim())
     }
 
     // --- ColorSettingsPage (TODO.md item 6) ---

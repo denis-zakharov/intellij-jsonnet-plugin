@@ -142,7 +142,12 @@ tests plus a `BasePlatformTestCase` that drives the real panel).
   Jumping into an imported file doesn't retarget Preview at it (`jumpTarget`
   guard, mutation-checked). Not built: the plan's full §4.4 "every PSI
   `TextRange` → `Expr`" mapping — click-jump didn't need it.
-- Still evaluates on the EDT (pre-existing); a slow evaluation blocks the UI.
+- **Evaluation runs off the EDT** (pooled thread; one in flight, refreshes requested meanwhile
+  collapse into one re-run and the stale result is dropped; old output stays until the new is
+  ready). Not `ReadAction.nonBlocking` on purpose: sjsonnet never checks for cancellation, so a read
+  action held across the evaluation would block the next keystroke's write action;
+  `VirtualFileText.read` takes short read actions per file instead. A running evaluation can't be
+  killed, only ignored. Still on the EDT: `SourceLocator.locate` on Ctrl/Cmd+click (re-evaluates lazily).
 
 ### 5. ~~Preview/import resolution should honor unsaved buffers~~ — DONE
 `VirtualFileText.read` (live `Document` if one is loaded, else VFS) is now the
