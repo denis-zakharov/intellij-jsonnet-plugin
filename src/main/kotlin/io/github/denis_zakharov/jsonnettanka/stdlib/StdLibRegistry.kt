@@ -49,7 +49,10 @@ object StdLibRegistry {
         return value.allKeyNames().toList().filterNot { it.startsWith("__") }.sorted()
     }
 
-    data class Parameter(val name: String, val optional: Boolean)
+    data class Parameter(val name: String, val optional: Boolean) {
+        /** `name`, or `[name]` when the parameter has a default — the notation hover and completion both show. */
+        val display: String get() = if (optional) "[$name]" else name
+    }
 
     /**
      * Parameter names of `std.<name>` as the pinned engine declares them (so they match what named arguments

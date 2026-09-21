@@ -45,7 +45,7 @@ class StdLibDocumentationProvider : AbstractDocumentationProvider() {
     private fun stdMemberDoc(project: Project, name: String): String {
         val parameters = StdLibRegistry.parameters(name)
         val signature = if (parameters == null) "std.$name" else
-            "std.$name(" + parameters.joinToString(", ") { if (it.optional) "[${it.name}]" else it.name } + ")"
+            "std.$name(" + parameters.joinToString(", ") { it.display } + ")"
         val docs = StdLibDocs.forName(name)
         val example = StdLibExamples.forName(name)
 

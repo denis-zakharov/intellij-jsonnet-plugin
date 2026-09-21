@@ -46,7 +46,10 @@ object JsonnetLookupElements {
 
     private fun withParams(builder: LookupElementBuilder, params: JsonnetParamList?): LookupElementBuilder {
         if (params == null) return builder
-        val names = params.paramList.mapNotNull { it.nameIdentifier?.text }
+        // `[name]` marks a parameter with a default, the same notation `std.*` completion and hover use.
+        val names = params.paramList.mapNotNull { param ->
+            param.nameIdentifier?.text?.let { if (param.expr != null) "[$it]" else it }
+        }
         return builder
             .withTailText("(${names.joinToString(", ")})", true)
             .withInsertHandler(ParenthesesInsertHandler.getInstance(names.isNotEmpty()))

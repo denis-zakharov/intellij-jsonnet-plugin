@@ -1,7 +1,9 @@
 package io.github.denis_zakharov.jsonnettanka.platform
 
 import io.github.denis_zakharov.jsonnettanka.lang.psi.JsonnetField
+import io.github.denis_zakharov.jsonnettanka.stdlib.StdLibRegistry
 import com.intellij.codeInsight.lookup.Lookup
+import com.intellij.codeInsight.lookup.LookupElementPresentation
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiPolyVariantReference
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
@@ -239,5 +241,56 @@ class JsonnetNavigationCompletionTest : BasePlatformTestCase() {
         myFixture.addFileToProject("libs/one.libsonnet", "{}")
         myFixture.addFileToProject("libs/two.libsonnet", "{}")
         assertContainsElements(complete("local x = import 'libs/<caret>';"), "one.libsonnet", "two.libsonnet")
+    }
+
+    /** `name` -> tail text (the parameter list) of every item offered at the caret. */
+    private fun tailTexts(text: String): Map<String, String?> {
+        myFixture.configureByText("main.jsonnet", text)
+        myFixture.completeBasic()
+        return myFixture.lookup.items.associate { item ->
+            val presentation = LookupElementPresentation()
+            item.renderElement(presentation)
+            item.lookupString to presentation.tailText
+        }
+    }
+
+    fun `test std functions show their parameters`() {
+        val tails = tailTexts("std.<caret>")
+        assertEquals("(func, arr, init)", tails["foldl"])
+    }
+
+    fun `test std parameters with defaults are bracketed`() {
+        val tails = tailTexts("std.<caret>")
+        val optional = StdLibRegistry.memberNames.mapNotNull { name ->
+            StdLibRegistry.parameters(name)?.takeIf { p -> p.any { it.optional } }?.let { name to it }
+        }
+        assertNotEmpty(optional)
+        for ((name, params) in optional) {
+            assertEquals(name, "(${params.joinToString(", ") { it.display }})", tails[name])
+            assertTrue(name, tails[name]!!.contains("["))
+        }
+    }
+
+    fun `test std values are not offered as calls`() {
+        val tails = tailTexts("std.<caret>")
+        assertNull(tails["pi"])
+        assertNull(tails["thisFile"])
+    }
+
+    fun `test std function gets parentheses with the caret inside`() {
+        myFixture.configureByText("main.jsonnet", "std.mapWithInd<caret>")
+        myFixture.completeBasic()
+        myFixture.checkResult("std.mapWithIndex(<caret>)")
+    }
+
+    fun `test std function already followed by a call is not doubled`() {
+        myFixture.configureByText("main.jsonnet", "std.mapWithInd<caret>(f, a)")
+        myFixture.completeBasic()
+        myFixture.checkResult("std.mapWithIndex(f, a)")
+    }
+
+    fun `test user function parameters with defaults are bracketed`() {
+        val tails = tailTexts("local f(a, b=1) = a + b; f<caret>")
+        assertEquals("(a, [b])", tails["f"])
     }
 }
