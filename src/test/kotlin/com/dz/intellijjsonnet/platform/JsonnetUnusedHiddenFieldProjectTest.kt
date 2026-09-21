@@ -69,4 +69,45 @@ class JsonnetUnusedHiddenFieldProjectTest : BasePlatformTestCase() {
         val lib = myFixture.addFileToProject("lib.libsonnet", "{ helper:: 1, y: self.helper }")
         assertEmpty(hiddenFieldWarnings(lib))
     }
+
+    // `withX():: { x+:: ... }` patches the base `x::` that `new()` declares; `self.x` only resolves to the
+    // base, but what it reads at runtime is the merged object, so the mixin field is used too.
+    fun `test mixin field merging into a same-named base field is not reported`() {
+        val lib = myFixture.addFileToProject(
+            "lib.libsonnet",
+            "{ new():: { local app = self, props:: {}, out: app.props }, withProps():: { props+:: { a: 1 } } }",
+        )
+        myFixture.addFileToProject("main.jsonnet", "local l = import 'lib.libsonnet'; l.new() + l.withProps()")
+        assertEmpty(hiddenFieldWarnings(lib))
+    }
+
+    // `c+:: { logging:: null }` exists for its visibility: it hides the `logging:` another mixin adds.
+    fun `test hiding a field inside a merged value is not reported`() {
+        val lib = myFixture.addFileToProject(
+            "lib.libsonnet",
+            """
+            {
+              new():: { local app = self, c:: {}, out: std.objectValues(app.c) },
+              withLogging():: { c+:: { logging: 1 } },
+              withoutLogging():: { c+:: { logging:: null } },
+            }
+            """.trimIndent(),
+        )
+        myFixture.addFileToProject(
+            "main.jsonnet",
+            "local l = import 'lib.libsonnet'; l.new() + l.withLogging() + l.withoutLogging()",
+        )
+        assertEmpty(hiddenFieldWarnings(lib))
+    }
+
+    fun `test mixin field with no base and no reads is still reported`() {
+        val lib = myFixture.addFileToProject("lib.libsonnet", "{ helper+:: 1 }")
+        assertEquals(listOf("Hidden field 'helper' is never used in this project"), hiddenFieldWarnings(lib))
+    }
+
+    fun `test hidden field inside a merged value with no same-named field elsewhere is still reported`() {
+        val lib = myFixture.addFileToProject("lib.libsonnet", "{ w():: { c+: { extra:: 1 } } }")
+        myFixture.addFileToProject("main.jsonnet", "local l = import 'lib.libsonnet'; l.w()")
+        assertEquals(listOf("Hidden field 'extra' is never used in this project"), hiddenFieldWarnings(lib))
+    }
 }

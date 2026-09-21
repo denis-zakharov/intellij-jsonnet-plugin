@@ -271,7 +271,14 @@ ecosystem at all — see the plan doc).
   in-object-only check flagged them everywhere. `JsonnetUnusedDeclarationUtil.isUnusedHiddenField`
   stays the cheap, service-free in-object check; the inspection then asks the word index for same-named
   tokens. Rule: `x.name` counts unless it positively resolves to a *different* field (unknown receiver
-  ⇒ maybe used); a `'name'` string counts (`o['name']`, `std.objectHasAll`); comments/locals don't;
+  ⇒ maybe used); a `'name'` string counts (`o['name']`, `std.objectHasAll`); comments/locals don't.
+  **Mixin fields are exempt from the "resolves to a different field" clause**
+  (`JsonnetFieldUsageSearch.isMixin`: `+::`/`+:::`, or inside the value of a `+:`-family field): in
+  `new():: { props:: {}, out: self.props }` + `withProps():: { props+:: {..} }`, `self.props` resolves to
+  the base only, but at runtime reads the merge. For them any same-named read, or a same-named
+  declaration elsewhere (`c+:: { logging:: null }` exists for its visibility, never read), counts.
+  Found on a real Tanka project (`with*` mixins were all reported). Unreferenced exported API
+  (`withX():: ...` never called in the project) is still reported, by design;
   `vendor/` files aren't inspected. The word index needs `JsonnetFindUsagesProvider`'s
   `WordsScanner` — without a registered provider there is nothing to search (and no Find Usages).
 

@@ -3,8 +3,10 @@ package com.dz.intellijjsonnet.inspection
 import com.dz.intellijjsonnet.lang.JsonnetFileType
 import com.dz.intellijjsonnet.lang.LibsonnetFileType
 import com.dz.intellijjsonnet.lang.psi.JsonnetDotSuffix
+import com.dz.intellijjsonnet.lang.psi.JsonnetExpr
 import com.dz.intellijjsonnet.lang.psi.JsonnetField
 import com.dz.intellijjsonnet.lang.psi.JsonnetImportExpr
+import com.dz.intellijjsonnet.lang.psi.JsonnetObjectLiteral
 import com.dz.intellijjsonnet.lang.psi.JsonnetTypes
 import com.dz.intellijjsonnet.lang.psi.reference.JsonnetLookupElements
 import com.dz.intellijjsonnet.lang.psi.reference.JsonnetResolver
@@ -13,6 +15,8 @@ import com.intellij.psi.PsiPolyVariantReference
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.PsiSearchHelper
 import com.intellij.psi.search.UsageSearchContext
+import com.intellij.psi.tree.TokenSet
+import com.intellij.psi.util.PsiTreeUtil
 
 /**
  * Project-wide "could anything read this field?" — the half of the unused-hidden-field check that
@@ -24,6 +28,11 @@ import com.intellij.psi.search.UsageSearchContext
  *  - `x.name` counts unless it positively resolves to a *different* object's field;
  *  - a string `'name'` counts (`o['name']`, `std.objectHasAll(o, 'name')`), except as a field name/import path;
  *  - comments, local variables and other declarations never count.
+ *
+ * Mixin fields (see [isMixin]) are the exception to "resolves to a different field": `withX():: { x+:: ... }`
+ * is merged into whatever object declares the base `x::`, so a `self.x` that resolves to the base *reads* the
+ * mixin's contribution too — and a `logging:: null` inside a merged value is there for its visibility
+ * effect, not to be read. For those, any same-named read or same-named declaration elsewhere counts.
  */
 object JsonnetFieldUsageSearch {
 
@@ -33,6 +42,7 @@ object JsonnetFieldUsageSearch {
         if (!JsonnetLookupElements.isPlainIdentifier(name)) return true
 
         val project = field.project
+        val mixin = isMixin(field)
         val scope = GlobalSearchScope.getScopeRestrictedByFileTypes(
             GlobalSearchScope.projectScope(project), JsonnetFileType, LibsonnetFileType,
         )
@@ -40,7 +50,7 @@ object JsonnetFieldUsageSearch {
         PsiSearchHelper.getInstance(project).processElementsWithWord(
             { element, _ ->
                 // The processor is also offered every ancestor of the hit; only the token itself matters.
-                if (element.node?.firstChildNode == null && isUse(element, field, name)) used = true
+                if (element.node?.firstChildNode == null && isUse(element, field, name, mixin)) used = true
                 !used
             },
             scope, name, UsageSearchContext.ANY, true,
@@ -48,12 +58,39 @@ object JsonnetFieldUsageSearch {
         return used
     }
 
-    private fun isUse(token: PsiElement, field: JsonnetField, name: String): Boolean = when (token.node.elementType) {
-        JsonnetTypes.IDENTIFIER -> (token.parent as? JsonnetDotSuffix)?.let { couldSelect(it, field) } ?: false
-        JsonnetTypes.STRING -> token.parent.let { it !is JsonnetField && it !is JsonnetImportExpr } &&
-            token.text.trim('\'', '"') == name
-        else -> false
+    private fun isUse(token: PsiElement, field: JsonnetField, name: String, mixin: Boolean): Boolean {
+        val parent = token.parent
+        return when (token.node.elementType) {
+            JsonnetTypes.IDENTIFIER -> when {
+                parent is JsonnetDotSuffix -> mixin || couldSelect(parent, field)
+                else -> mixin && isOtherDeclaration(parent, field)
+            }
+            JsonnetTypes.STRING -> when {
+                token.text.trim('\'', '"') != name -> false
+                parent is JsonnetField -> mixin && isOtherDeclaration(parent, field)
+                else -> parent !is JsonnetImportExpr
+            }
+            else -> false
+        }
     }
+
+    private fun isOtherDeclaration(parent: PsiElement, field: JsonnetField): Boolean =
+        parent is JsonnetField && parent != field
+
+    /**
+     * Whether [field] is merged into a same-named field defined elsewhere: it uses `+::`/`+:::`, or sits in an
+     * object literal that is the value of a `+:`-family field (`c+:: { logging:: null }`).
+     */
+    internal fun isMixin(field: JsonnetField): Boolean {
+        if (field.node.findChildByType(MERGE_OPS) != null) return true
+        val literal = PsiTreeUtil.getParentOfType(field, JsonnetObjectLiteral::class.java) ?: return false
+        val owner = (literal.parent as? JsonnetExpr)?.parent as? JsonnetField ?: return false
+        return owner.node.findChildByType(MERGE_OPS) != null
+    }
+
+    private val MERGE_OPS = TokenSet.create(
+        JsonnetTypes.PLUSCOLON, JsonnetTypes.PLUSCOLONCOLON, JsonnetTypes.PLUSCOLONCOLONCOLON,
+    )
 
     private fun couldSelect(suffix: JsonnetDotSuffix, field: JsonnetField): Boolean {
         val targets = (suffix.reference as? PsiPolyVariantReference)?.multiResolve(false) ?: return true
