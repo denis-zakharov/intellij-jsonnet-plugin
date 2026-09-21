@@ -1,125 +1,248 @@
 package io.github.denis_zakharov.jsonnettanka.formatter
 
-import io.github.denis_zakharov.jsonnettanka.lang.psi.JsonnetTypes
 import com.intellij.formatting.Alignment
 import com.intellij.formatting.Block
 import com.intellij.formatting.ChildAttributes
 import com.intellij.formatting.Indent
 import com.intellij.formatting.Spacing
-import com.intellij.formatting.SpacingBuilder
 import com.intellij.formatting.Wrap
 import com.intellij.lang.ASTNode
 import com.intellij.psi.TokenType
+import com.intellij.psi.codeStyle.CodeStyleSettings
 import com.intellij.psi.formatter.common.AbstractBlock
+import com.intellij.psi.tree.TokenSet
+import io.github.denis_zakharov.jsonnettanka.lang.psi.JsonnetTypes.*
 
 /**
- * Native (non-shell-out) formatter, v1: gets indentation right for object and
- * array literals — the highest-visual-impact part of Reformat Code for a
- * JSON-like language — plus baseline operator/punctuation spacing. Doesn't
- * attempt line-wrapping decisions or comment/text-block-aware reflow; the
- * Phase 2 `jsonnetfmt`/`tk fmt` shell-out stays registered alongside this as
- * a fallback for anyone who wants exact upstream-`jsonnetfmt` output.
+ * The Block-model formatter: what typing (Enter, a typed closer), paste, quick fixes and files with syntax errors use.
+ * Reformat Code on a valid file goes through [JsonnetFormattingService] and the `jsonnetfmt` port instead.
+ *
+ * The indent rules follow `fmt/FixIndentation` (the port), translated to what our *flat* PSI offers (`a.b(c) + d` is one
+ * `Expr`, no precedence tree) and to IntelliJ's `Indent`/`Alignment` vocabulary:
+ *
+ *  - members of `{ }`, `[ ]`, argument and parameter lists, `local` binds, comprehension parts and `assert` operands share
+ *    an [Alignment] with a normal indent: if the first one sits on the opener's line the rest line up with it, otherwise
+ *    they are one indent level in (`deriveIndent`);
+ *  - closers, `then`/`else`, `;` and the body of a `local`/`assert` stay at the construct's own indent;
+ *  - the operands, operators, `.x`, `(...)` and `{ ... }` suffixes of one flat expression all line up with its first
+ *    operand (`alignStrong`/`align` in the port);
+ *  - a value that starts on a new line (`a:⏎value`, `local x =⏎value`, `if c then⏎value`) is one level in.
+ *
+ * Deliberate deviations, all in rare shapes (see TODO.md item 15): the "strong indent" the port switches to when a later
+ * call argument/array element starts a line, and hanging field values on the second and later fields of a `{ a: 1,`
+ * object. `JsonnetTypingConsistencyTest` measures the agreement against real `jsonnetfmt` output.
  */
-class JsonnetBlock(
+class JsonnetBlock private constructor(
     node: ASTNode,
     wrap: Wrap?,
     alignment: Alignment?,
-    private val spacingBuilder: SpacingBuilder,
+    private val indent: Indent,
+    private val ctx: Context,
 ) : AbstractBlock(node, wrap, alignment) {
 
-    companion object {
-        private val INDENTED_CONTAINERS = setOf(
-            JsonnetTypes.OBJECT_LITERAL,
-            JsonnetTypes.ARRAY_LITERAL,
-            JsonnetTypes.OBJECT_MEMBER_LIST,
-            JsonnetTypes.ARRAY_MEMBER_LIST,
-            JsonnetTypes.ARG_LIST,
-            JsonnetTypes.PARAM_LIST,
-        )
-
-        // objectLiteral/arrayLiteral wrap a *separate* objectMemberList/
-        // arrayMemberList node holding the actual members (see Jsonnet.bnf),
-        // unlike argList/paramList which have no such wrapper and hold their
-        // elements directly. Both the wrapper and its members are in
-        // INDENTED_CONTAINERS (the wrapper needs to be there so a member's
-        // *own* nested containers still indent correctly), so without this,
-        // a member would inherit indent from both its literal grandparent
-        // and its member-list parent — double-indenting every field/element
-        // one level too deep. The wrapper itself is purely structural (it
-        // never starts its own line), so it carries no indent of its own.
-        private val TRANSPARENT_LIST_WRAPPERS = setOf(
-            JsonnetTypes.OBJECT_MEMBER_LIST,
-            JsonnetTypes.ARRAY_MEMBER_LIST,
-        )
+    class Context(val settings: CodeStyleSettings) {
+        val custom: JsonnetCodeStyleSettings = settings.getCustomSettings(JsonnetCodeStyleSettings::class.java)
+        val keepBlankLines: Int get() = if (custom.MAX_BLANK_LINES <= 0) Int.MAX_VALUE else custom.MAX_BLANK_LINES
     }
+
+    /**
+     * The alignment shared by the members of this block (see the class comment); also handed out for a new line.
+     * A flat expression that is itself an aligned member reuses its own alignment for its continuation lines: they line
+     * up with the member's column, which is where the member sits anyway.
+     */
+    private val memberAlignment: Alignment = (if (node.elementType == EXPR) alignment else null) ?: Alignment.createAlignment()
+
+    private class Spec(val indent: Indent, val alignment: Alignment? = null)
 
     override fun buildChildren(): MutableList<Block> {
-        val blocks = mutableListOf<Block>()
+        val kids = significantChildren()
+        return kids.map { child ->
+            val spec = specFor(child, kids)
+            // Only single-line members are aligned. For a block that does not start a line, IntelliJ bases the indent of
+            // everything below it that starts a line on the alignment column of any aligned block starting at the same
+            // offset (`AbstractBlockWrapper.createAlignmentIndent`), which would turn `[{⏎  a: 1⏎}]` and
+            // `local x =⏎  v;` into column-of-the-member indents instead of jsonnetfmt's base + one level.
+            val alignment = spec.alignment?.takeUnless { child.textContains('\n') }
+            JsonnetBlock(child, null, alignment, spec.indent, ctx) as Block
+        }.toMutableList()
+    }
+
+    private fun significantChildren(): List<ASTNode> {
+        val kids = mutableListOf<ASTNode>()
         var child = myNode.firstChildNode
         while (child != null) {
-            if (child.elementType != TokenType.WHITE_SPACE && child.textRange.length > 0) {
-                blocks.add(JsonnetBlock(child, null, null, spacingBuilder))
-            }
+            if (child.elementType != TokenType.WHITE_SPACE && child.textLength > 0) kids += child
             child = child.treeNext
         }
-        return blocks
+        return kids
     }
 
-    override fun getIndent(): Indent? {
-        if (myNode.elementType in TRANSPARENT_LIST_WRAPPERS) return Indent.getNoneIndent()
-        val parentType = myNode.treeParent?.elementType ?: return Indent.getNoneIndent()
-        if (parentType !in INDENTED_CONTAINERS) return Indent.getNoneIndent()
-        // Both bracket tokens sit at the container's own indent level, not one
-        // deeper — only the interior list (the actual indented content) should
-        // get NORMAL. Missing this for the *opening* bracket (originally only
-        // RBRACE/RBRACK were excluded) meant the formatter's line-1 block
-        // started a new line pretending to be an already-indented continuation,
-        // which pushed every level below it (including outer closing braces,
-        // via the engine's own "the opening line was already indented as if
-        // deeper" bookkeeping) one level too deep — see the reformat test.
+    private val normal: Indent get() = Indent.getNormalIndent()
+    private val none: Indent get() = Indent.getNoneIndent()
+
+    /** Indent and alignment of [child] inside this block. Comments take those of whatever they precede. */
+    private fun specFor(child: ASTNode, kids: List<ASTNode>): Spec {
+        if (child.elementType == COMMENT) {
+            val at = kids.indexOf(child)
+            val next = kids.drop(at + 1).firstOrNull { it.elementType != COMMENT }
+            val previous = kids.take(at).lastOrNull { it.elementType != COMMENT }
+            return when {
+                // A comment before the closer belongs to the contents.
+                next != null && next.elementType in CLOSERS -> Spec(normal)
+                next != null -> specFor(next, kids)
+                previous != null -> specFor(previous, kids)
+                else -> Spec(none)
+            }
+        }
+        val t = child.elementType
         return when (myNode.elementType) {
-            JsonnetTypes.LBRACE, JsonnetTypes.RBRACE, JsonnetTypes.LBRACK, JsonnetTypes.RBRACK -> Indent.getNoneIndent()
-            else -> Indent.getNormalIndent()
+            OBJECT_LITERAL, ARRAY_LITERAL ->
+                Spec(if (t in LITERAL_STRUCTURE) none else normal)
+            // A comprehension is not transparent like a member list: its parts (locals, `[name]: value`, `for`, `if`) are
+            // its own children, so it carries the one level of indent and they sit at its column.
+            OBJECT_MEMBER_LIST, ARRAY_MEMBER_LIST, ARG_LIST ->
+                if (t == COMMA) Spec(normal) else Spec(normal, memberAlignment)
+            PARAM_LIST -> when (t) {
+                LPAREN, RPAREN -> Spec(none)
+                COMMA -> Spec(normal)
+                else -> Spec(normal, memberAlignment)
+            }
+            OBJECT_COMPREHENSION -> when (t) {
+                OBJECT_LOCAL, COMPUTED_FIELD_NAME, FOR_SPEC, IF_SPEC -> Spec(none, memberAlignment)
+                COLON -> Spec(none)
+                else -> Spec(normal)
+            }
+            ARRAY_COMPREHENSION -> if (t == EXPR || t == FOR_SPEC || t == IF_SPEC) Spec(none, memberAlignment) else Spec(none)
+            FIELD, BIND -> Spec(if (t == EXPR) normal else none)
+            OBJECT_ASSERT -> if (t == EXPR || t == COLON) Spec(normal, memberAlignment) else Spec(none)
+            ASSERT_EXPR -> {
+                val semi = kids.indexOfFirst { it.elementType == SEMI }
+                if (semi >= 0 && kids.indexOf(child) > semi) Spec(none)
+                else if (t == ASSERT_KW) Spec(none)
+                else Spec(normal, memberAlignment)
+            }
+            LOCAL_EXPR -> when (t) {
+                BIND -> Spec(normal, memberAlignment)
+                else -> Spec(none)
+            }
+            IF_EXPR, FUNCTION_EXPR -> Spec(if (t == EXPR) normal else none)
+            IMPORT_EXPR, ERROR_EXPR, UNARY_OP_EXPR ->
+                Spec(if (kids.firstOrNull() === child) none else normal)
+            PAREN_EXPR, INDEX_SUFFIX, NAMED_ARG, PARAM, COMPUTED_FIELD_NAME, FOR_SPEC, IF_SPEC ->
+                Spec(if (t == EXPR) normal else none)
+            // The first operand of an aligned member is covered by the member's own alignment.
+            EXPR -> when {
+                kids.size <= 1 -> Spec(none)
+                kids.first() === child && alignment != null -> Spec(none)
+                else -> Spec(none, memberAlignment)
+            }
+            else -> Spec(none)
         }
     }
+
+    override fun getIndent(): Indent = indent
 
     override fun getChildAttributes(newChildIndex: Int): ChildAttributes {
-        val type = myNode.elementType
-        return if (type in INDENTED_CONTAINERS) {
-            ChildAttributes(Indent.getNormalIndent(), null)
-        } else {
-            ChildAttributes(Indent.getNoneIndent(), null)
+        val blocks = subBlocks
+        val previous = blocks.getOrNull(newChildIndex - 1) as? JsonnetBlock
+        val prevType = previous?.myNode?.elementType
+        fun list(indent: Indent) = ChildAttributes(indent, memberAlignment)
+        fun plain(indent: Indent) = ChildAttributes(indent, null)
+        return when (myNode.elementType) {
+            OBJECT_MEMBER_LIST, ARRAY_MEMBER_LIST, ARG_LIST, PARAM_LIST,
+            OBJECT_COMPREHENSION, ARRAY_COMPREHENSION, OBJECT_ASSERT -> list(normal)
+            // After the contents of a bracket pair: line up with them, as the next member would.
+            OBJECT_LITERAL, ARRAY_LITERAL, CALL_SUFFIX ->
+                if (previous != null && prevType in MEMBER_LISTS) ChildAttributes(normal, previous.memberAlignment) else plain(normal)
+            LOCAL_EXPR -> when (prevType) {
+                SEMI -> plain(none)
+                LOCAL_KW -> plain(normal)
+                else -> list(normal)
+            }
+            ASSERT_EXPR -> if (prevType == SEMI) plain(none) else list(normal)
+            // `if c then⏎`, `else⏎`: the branch is one level in; after a complete branch `then`/`else` come at the `if`.
+            IF_EXPR -> if (prevType == IF_KW || prevType == THEN_KW || prevType == ELSE_KW) plain(normal) else plain(none)
+            FIELD, BIND, FUNCTION_EXPR, IMPORT_EXPR, ERROR_EXPR, UNARY_OP_EXPR, NAMED_ARG, PARAM,
+            PAREN_EXPR, INDEX_SUFFIX, COMPUTED_FIELD_NAME, FOR_SPEC, IF_SPEC -> plain(normal)
+            // `a +⏎`: the continuation lines up with the first operand.
+            EXPR -> if (blocks.size > 1) list(none) else plain(none)
+            else -> plain(none)
         }
     }
 
-    override fun getSpacing(child1: Block?, child2: Block): Spacing? = spacingBuilder.getSpacing(this, child1, child2)
+    override fun getSpacing(child1: Block?, child2: Block): Spacing? {
+        val b1 = child1 as? JsonnetBlock ?: return null
+        val b2 = child2 as? JsonnetBlock ?: return null
+        val spaces = spacesBetween(myNode.elementType, b1.myNode.elementType, b2.myNode.elementType) ?: return null
+        return Spacing.createSpacing(spaces, spaces, 0, true, ctx.keepBlankLines)
+    }
+
+    /** Number of spaces `jsonnetfmt` puts between two siblings, or null if we have no opinion (comments, gaps, ...). */
+    private fun spacesBetween(parent: com.intellij.psi.tree.IElementType, t1: com.intellij.psi.tree.IElementType, t2: com.intellij.psi.tree.IElementType): Int? {
+        if (t1 == COMMENT || t2 == COMMENT) return null
+        fun pad(on: Boolean) = if (on) 1 else 0
+        return when (parent) {
+            OBJECT_LITERAL -> when {
+                t1 == LBRACE && t2 == RBRACE -> 0
+                t1 == LBRACE || t2 == RBRACE -> pad(ctx.custom.PAD_OBJECTS)
+                else -> null
+            }
+            ARRAY_LITERAL -> when {
+                t1 == LBRACK && t2 == RBRACK -> 0
+                t1 == LBRACK || t2 == RBRACK -> pad(ctx.custom.PAD_ARRAYS)
+                else -> null
+            }
+            OBJECT_MEMBER_LIST, ARRAY_MEMBER_LIST, ARG_LIST -> when {
+                t2 == COMMA -> 0
+                t1 == COMMA -> 1
+                else -> null
+            }
+            PARAM_LIST -> when {
+                t1 == LPAREN || t2 == RPAREN || t2 == COMMA -> 0
+                t1 == COMMA -> 1
+                else -> null
+            }
+            CALL_SUFFIX, INDEX_SUFFIX, PAREN_EXPR, COMPUTED_FIELD_NAME, DOT_SUFFIX -> 0
+            FIELD -> when {
+                t2 == PARAM_LIST || t2 in FIELD_OPS -> 0
+                t1 in FIELD_OPS -> 1
+                else -> null
+            }
+            BIND -> if (t2 == PARAM_LIST) 0 else if (t1 == ASSIGN || t2 == ASSIGN) 1 else null
+            NAMED_ARG, PARAM -> if (t1 == ASSIGN || t2 == ASSIGN) 0 else null
+            LOCAL_EXPR -> if (t2 == COMMA || t2 == SEMI) 0 else 1
+            OBJECT_LOCAL, OBJECT_ASSERT, ARRAY_COMPREHENSION, FOR_SPEC, IF_SPEC, IF_EXPR, IMPORT_EXPR, ERROR_EXPR -> 1
+            OBJECT_COMPREHENSION -> if (t2 == COMMA || t2 == COLON) 0 else 1
+            FUNCTION_EXPR -> if (t2 == PARAM_LIST) 0 else 1
+            ASSERT_EXPR -> if (t2 == SEMI) 0 else 1
+            UNARY_OP_EXPR -> if (t1 in UNARY_OPS) 0 else flatSpacing(t1, t2)
+            EXPR -> flatSpacing(t1, t2)
+            else -> null
+        }
+    }
+
+    private fun flatSpacing(t1: com.intellij.psi.tree.IElementType, t2: com.intellij.psi.tree.IElementType): Int? = when {
+        t2 == DOT_SUFFIX || t2 == CALL_SUFFIX || t2 == INDEX_SUFFIX -> 0
+        t1 in BINARY_OPS || t2 in BINARY_OPS -> 1
+        t2 == OBJECT_LITERAL -> 1 // `base { ... }`, the implicit `+`
+        else -> null
+    }
 
     override fun isLeaf(): Boolean = myNode.firstChildNode == null
-}
 
-fun jsonnetSpacingBuilder(settings: com.intellij.psi.codeStyle.CodeStyleSettings): SpacingBuilder =
-    SpacingBuilder(settings, io.github.denis_zakharov.jsonnettanka.lang.JsonnetLanguage)
-        .before(JsonnetTypes.COLON).spaces(0)
-        .after(JsonnetTypes.COLON).spaces(1)
-        .before(JsonnetTypes.COLONCOLON).spaces(0)
-        .after(JsonnetTypes.COLONCOLON).spaces(1)
-        .before(JsonnetTypes.PLUSCOLON).spaces(0)
-        .after(JsonnetTypes.PLUSCOLON).spaces(1)
-        .before(JsonnetTypes.COMMA).spaces(0)
-        .after(JsonnetTypes.COMMA).spaces(1)
-        .around(JsonnetTypes.ASSIGN).spaces(1)
-        .around(JsonnetTypes.OROR).spaces(1)
-        .around(JsonnetTypes.ANDAND).spaces(1)
-        .around(JsonnetTypes.EQEQ).spaces(1)
-        .around(JsonnetTypes.NEQ).spaces(1)
-        .around(JsonnetTypes.LTE).spaces(1)
-        .around(JsonnetTypes.GTE).spaces(1)
-        .around(JsonnetTypes.PLUS).spaces(1)
-        .around(JsonnetTypes.MINUS).spaces(1)
-        .around(JsonnetTypes.STAR).spaces(1)
-        .around(JsonnetTypes.SLASH).spaces(1)
-        .around(JsonnetTypes.PERCENT).spaces(1)
-        .before(JsonnetTypes.LPAREN).spaces(0)
-        .before(JsonnetTypes.LBRACK).spaces(0)
-        .before(JsonnetTypes.DOT).spaces(0)
-        .after(JsonnetTypes.DOT).spaces(0)
+    companion object {
+        private val LITERAL_STRUCTURE = TokenSet.create(
+            LBRACE, RBRACE, LBRACK, RBRACK, OBJECT_MEMBER_LIST, ARRAY_MEMBER_LIST,
+        )
+        private val CLOSERS = TokenSet.create(RBRACE, RBRACK, RPAREN)
+        private val MEMBER_LISTS = TokenSet.create(OBJECT_MEMBER_LIST, ARRAY_MEMBER_LIST, ARG_LIST, OBJECT_COMPREHENSION, ARRAY_COMPREHENSION)
+        private val FIELD_OPS = TokenSet.create(COLON, COLONCOLON, COLONCOLONCOLON, PLUSCOLON, PLUSCOLONCOLON, PLUSCOLONCOLONCOLON)
+        private val UNARY_OPS = TokenSet.create(BANG, MINUS, PLUS, TILDE)
+        private val BINARY_OPS = TokenSet.create(
+            OROR, ANDAND, PIPE, CARET, AMP, EQEQ, NEQ, LTE, GTE, SHL, SHR, LT, GT, IN_KW, PLUS, MINUS, STAR, SLASH, PERCENT,
+        )
+
+        fun root(node: ASTNode, settings: CodeStyleSettings): JsonnetBlock =
+            JsonnetBlock(node, null, null, Indent.getNoneIndent(), Context(settings))
+    }
+}

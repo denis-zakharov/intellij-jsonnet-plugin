@@ -8,12 +8,7 @@ import com.intellij.formatting.FormattingModelProvider
 class JsonnetFormattingModelBuilder : FormattingModelBuilder {
     override fun createModel(formattingContext: FormattingContext): FormattingModel {
         val settings = formattingContext.codeStyleSettings
-        val block = JsonnetBlock(
-            formattingContext.node,
-            null,
-            null,
-            jsonnetSpacingBuilder(settings),
-        )
+        val block = JsonnetBlock.root(formattingContext.node, settings)
         return FormattingModelProvider.createFormattingModelForPsiFile(formattingContext.containingFile, block, settings)
     }
 }

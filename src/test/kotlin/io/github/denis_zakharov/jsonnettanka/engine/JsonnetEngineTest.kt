@@ -22,6 +22,11 @@ class JsonnetEngineTest {
     }
 
     @Test
+    fun `evaluates digit separators`() {
+        assertEquals("1000", ok(JsonnetEngine.evaluate("sep.jsonnet", "1_000")))
+    }
+
+    @Test
     fun `reports parse errors instead of throwing`() {
         val result = JsonnetEngine.evaluate("bad.jsonnet", "{ a: ")
         assertTrue(result is JsonnetEngine.Result.Failure)

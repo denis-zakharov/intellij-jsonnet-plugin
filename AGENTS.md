@@ -369,9 +369,9 @@ ecosystem at all — see the plan doc).
 - The JVM stack is not Go's: 10,000 nested arrays (`error.parse.deep_array_nesting.jsonnet`) overflow the recursive
   passes, so `format()` turns `StackOverflowError` into a `ParseError` ("nested too deeply") instead of crashing the EDT.
 - `Options.WHITESPACE_ONLY` (`rewriteTokens = false`, styles = leave, no import sorting) is for callers with
-  `canChangeWhiteSpaceOnly`. The lexer still drops digit separators (`1_000` -> `1000`), so `JsonnetFormattingService`
-  verifies the result differs only in whitespace and otherwise does nothing. (Our own PSI lexer doesn't know `1_000` at
-  all, so such a file has PSI errors and never reaches the service; known gap, jsonnet >= 0.20 accepts them.)
+  `canChangeWhiteSpaceOnly`. The port's lexer drops digit separators (`1_000` -> `1000`), so `JsonnetFormattingService`
+  verifies the result differs only in whitespace and otherwise does nothing (`Jsonnet.flex` lexes `1_000`, so such a file does
+  reach the service and the guard is what refuses it).
 - **Wiring** (`formatter/`): `JsonnetFormattingService` (`AbstractDocumentFormattingService`, `order="first"`) declares only
   `FORMAT_FRAGMENTS`, no `AD_HOC_FORMATTING`, so per `FormattingServiceUtil.findService` only explicit reformat reaches it and
   paste/quick-fix formatting stays on the Block model (`JsonnetFormattingModelBuilder`), which is also what files with PSI errors
@@ -382,10 +382,34 @@ ecosystem at all — see the plan doc).
   (before this the platform's 4 applied to typing).
 - Testing gotcha: `getIndentOptionsByFile` is cached per document when the file is opened, so in a `BasePlatformTestCase`
   set code style (`CodeStyle.runWithLocalSettings`) **before** `configureByText`, or an indent change is silently ignored.
-- **Not done yet (plan phase 4):** the Block model (`JsonnetBlock`) still has v1 indent rules and spacing; Enter / typed
-  `}` / paste indentation don't mirror `FixIndentation` (hanging alignment, `then`/`else`, binary continuation), `(`...`)`
-  isn't a structural brace pair, and there is no A-vs-B consistency harness. See `TODO.md` item 15; the original plan
-  (historical) is `formatter-plan.md`, section "B. Block model".
+- **Block model (typing side, `JsonnetBlock`)** follows `FixIndentation`: list members (`{}`/`[]` members, args, params, binds,
+  comprehension parts, `assert` operands) share an `Alignment` + normal indent, closers/`then`/`else`/`;`/bodies stay at the
+  construct's indent, all parts of one flat expression align with its first operand. `JsonnetTypingConsistencyTest` is the
+  measurement (strip a line's indent from canonical text, `adjustLineIndent`, compare; misses land in
+  `build/typing-consistency.txt`; extra corpus via `JSONNET_TYPING_CORPUS`), `JsonnetTypingTest` the Enter/typed-closer scenarios.
+  Things that cost real time:
+  - **An aligned block that doesn't start its line poisons the indent of everything below it that does**
+    (`AbstractBlockWrapper.createAlignmentIndent` bases it on the alignment *column*): `[{⏎  a: 1⏎}]` and `local x =⏎  v;` came out
+    at column-of-`{`/`x` + 2. So only *single-line* members carry the alignment (`textContains('\n')` in `buildChildren`).
+  - **Alignment must sit on the composite, not on its first leaf.** On-type formatting (`adjustLineIndent`, Enter) doesn't expand
+    blocks outside the affected range, so an anchor that is only alignment-on-a-leaf is invisible there. (Looked like "alignment
+    silently ignored"; the sources — `~/.gradle/caches/modules-2/files-2.1/com.jetbrains.intellij.idea/ideaIC/2025.1/*/ideaIC-2025.1-sources.jar`
+    — explain it: `AdjustWhiteSpacesState.defineAlignOffset`, `InitialInfoBuilder`.)
+  - **A comprehension can't be a transparent wrapper** like the member lists: its parts are its own children, so it carries the
+    indent itself and they sit at its column (`{ [k]: {` members were one level short otherwise).
+  - **Incomplete code needs PSI structure to be indented.** `objectLiteral`/`arrayLiteral` had no `pin`, so `{ a: 1,` was loose
+    tokens and `getChildAttributes` was never asked; same for `a +` (`binaryTail`), `else` (`elseBranch`), `local a = 1,` (`moreBind`).
+  - The platform re-indents only `}` and `)` when typed (hard-coded, through the highlighter's brace matcher, which also depended on
+    test order: it failed after `ParsingTestCase` classes ran in the same JVM). `JsonnetTypedHandler` does all three from the PSI.
+  - Enter between `{}` is the platform's; `[]`/`()` need `JsonnetEnterBetweenBracesDelegate` (`<enterBetweenBracesDelegate>`).
+  - Spacing is `spacesBetween(parent, left, right)` in the block (the old `SpacingBuilder` matched by token only and couldn't tell
+    `[a]` from `a[0]`); it keeps line breaks.
+  - Not mirrored: the port's "strong indent" and UTF-8 byte columns (see TODO.md item 15).
+- **Vendor/dot-files are skipped by Reformat Code** (`JsonnetFormatExclusions`, like `tk fmt`): the service returns without editing
+  rather than declining, because declining would let the Block model format them. Setting `SKIP_VENDOR_AND_DOTFILES`.
+- Testing reformat entry points: `ActionsOnSaveManager` doesn't run from `saveAllDocuments` in a light fixture, so on-save is
+  replayed with `ReformatCodeProcessor`; several ranges = `ReformatCodeProcessor(file, TextRange[])`; the notification is observed on
+  `Notifications.TOPIC`. `FormatOnSaveOptions`' all-file-types setter is package-private (don't bother).
 
 ## Platform baseline
 

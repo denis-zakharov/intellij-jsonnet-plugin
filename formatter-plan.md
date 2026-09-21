@@ -3,7 +3,7 @@
 > `AGENTS.md` ("Formatter") and `TODO.md` (items 14–22).
 >
 > Where the implementation departed from this plan:
-> - Phases 1–3 and 5 were done; **phase 4 (Block-model rewrite, typing-time indentation) was not** — see `TODO.md` item 15.
+> - Phases 1–3 and 5 were done; phase 4 (Block-model rewrite, typing-time indentation) is done too — see `TODO.md` item 15 for the measured agreement and the residual shapes.
 > - `Options` gained `rewriteTokens` (needed for a real whitespace-only mode); `WHITESPACE_ONLY` is not just "styles = leave".
 > - The service maps carets by hand (`JsonnetTextEdits.mapOffset`); the platform's default left them in front of inserted whitespace.
 > - `format()` converts `StackOverflowError` (10,000 nested arrays) into a `ParseError`; not anticipated here.

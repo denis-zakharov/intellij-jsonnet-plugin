@@ -45,6 +45,7 @@ class JsonnetLanguageCodeStyleSettingsProvider : LanguageCodeStyleSettingsProvid
                 consumer.showCustomOption(cls, "PRETTY_FIELD_NAMES", "Quote field names only when needed", group)
                 consumer.showCustomOption(cls, "SORT_IMPORTS", "Sort imports at the top of the file", group)
                 consumer.showCustomOption(cls, "USE_IMPLICIT_PLUS", "Drop redundant '+' before an object", group)
+                consumer.showCustomOption(cls, "SKIP_VENDOR_AND_DOTFILES", "Don't reformat vendor/ and dot-files (like tk fmt)", "Files")
             }
             else -> {}
         }

@@ -10,7 +10,7 @@ class JsonnetBraceMatcher : PairedBraceMatcher {
     private val pairs = arrayOf(
         BracePair(JsonnetTypes.LBRACE, JsonnetTypes.RBRACE, true),
         BracePair(JsonnetTypes.LBRACK, JsonnetTypes.RBRACK, true),
-        BracePair(JsonnetTypes.LPAREN, JsonnetTypes.RPAREN, false),
+        BracePair(JsonnetTypes.LPAREN, JsonnetTypes.RPAREN, true),
     )
 
     override fun getPairs(): Array<BracePair> = pairs

@@ -23,6 +23,9 @@ class JsonnetCodeStyleSettings(container: CodeStyleSettings) : CustomCodeStyleSe
     @JvmField var SORT_IMPORTS: Boolean = true
     @JvmField var USE_IMPLICIT_PLUS: Boolean = true
 
+    /** Leave `vendor/` and dot-files alone, like `tk fmt` does (see [JsonnetFormatExclusions]). */
+    @JvmField var SKIP_VENDOR_AND_DOTFILES: Boolean = true
+
     /** The formatter options these settings stand for, with [indent] spaces per level. */
     fun toOptions(indent: Int): Options = Options(
         indent = indent,

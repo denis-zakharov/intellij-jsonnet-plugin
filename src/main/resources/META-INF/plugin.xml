@@ -69,6 +69,12 @@
             language="Jsonnet"
             implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetBraceMatcher"/>
 
+        <typedHandler implementation="io.github.denis_zakharov.jsonnettanka.editor.JsonnetTypedHandler"/>
+
+        <enterBetweenBracesDelegate
+            language="Jsonnet"
+            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetEnterBetweenBracesDelegate"/>
+
         <lang.commenter
             language="Jsonnet"
             implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetCommenter"/>

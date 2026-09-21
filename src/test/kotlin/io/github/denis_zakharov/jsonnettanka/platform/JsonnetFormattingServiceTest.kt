@@ -1,6 +1,12 @@
 package io.github.denis_zakharov.jsonnettanka.platform
 
 import com.intellij.application.options.CodeStyle
+import com.intellij.codeInsight.actions.OptimizeImportsProcessor
+import com.intellij.codeInsight.actions.ReformatCodeProcessor
+import com.intellij.notification.Notification
+import com.intellij.notification.Notifications
+import com.intellij.openapi.util.TextRange
+import io.github.denis_zakharov.jsonnettanka.formatter.JsonnetFormatExclusions
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.psi.codeStyle.CodeStyleManager
@@ -96,6 +102,17 @@ class JsonnetFormattingServiceTest : BasePlatformTestCase() {
         assertFalse(JsonnetTextEdits.sameApartFromWhitespace("{a:1_000}", "{ a: 1000 }"))
     }
 
+    fun `test a whitespace-only reformat refuses a file with digit separators`() {
+        val text = "{a:1_000}"
+        myFixture.configureByText("a.jsonnet", text)
+        assertFalse(com.intellij.psi.util.PsiTreeUtil.hasErrorElements(myFixture.file)) // reaches the service now
+        reformat(canChangeWhiteSpaceOnly = true)
+        // The port would write 1000; that is not a whitespace change, so nothing happens.
+        assertEquals(text, myFixture.editor.document.text)
+        reformat()
+        assertEquals("{ a: 1000 }\n", myFixture.editor.document.text)
+    }
+
     fun `test carets map through edits`() {
         val original = "{a:1,b:2}"
         val edits = JsonnetTextEdits.compute(original, "{ a: 1, b: 2 }")
@@ -110,5 +127,109 @@ class JsonnetFormattingServiceTest : BasePlatformTestCase() {
         reformat()
         // Not jsonnetfmt output (there is none for broken code): the error is still there and nothing threw.
         assertTrue(myFixture.editor.document.text, com.intellij.psi.util.PsiTreeUtil.hasErrorElements(myFixture.file))
+    }
+
+    // --- item 17: vendor/ and dot-files ---
+
+    fun `test exclusion rules follow tk fmt`() {
+        val base = "/work/env"
+        for (excluded in listOf("/work/env/vendor/k.libsonnet", "/work/env/lib/vendor/x/y.libsonnet", "/work/env/.hidden.jsonnet", "/work/env/.git/x.jsonnet")) {
+            assertTrue(excluded, JsonnetFormatExclusions.isExcluded(excluded, base))
+        }
+        for (included in listOf("/work/env/main.jsonnet", "/work/env/lib/vendored.libsonnet", "/work/env/vendor.jsonnet")) {
+            assertFalse(included, JsonnetFormatExclusions.isExcluded(included, base))
+        }
+        // The project itself may live in a hidden directory; only what is below the root counts.
+        assertFalse(JsonnetFormatExclusions.isExcluded("/home/u/.work/env/main.jsonnet", "/home/u/.work/env"))
+        assertTrue(JsonnetFormatExclusions.isExcluded("/home/u/.work/env/vendor/a.libsonnet", "/home/u/.work/env"))
+        // Outside the project (or without one) only the file name and `vendor` directories are judged.
+        assertFalse(JsonnetFormatExclusions.isExcluded("/home/u/.work/main.jsonnet", null))
+        assertTrue(JsonnetFormatExclusions.isExcluded("/x/vendor/a.libsonnet", null))
+    }
+
+    fun `test Reformat Code leaves vendor files alone`() {
+        val text = "{a:1}"
+        val file = myFixture.addFileToProject("vendor/github.com/x/y.libsonnet", text).virtualFile
+        myFixture.configureFromExistingVirtualFile(file)
+        reformat()
+        assertEquals(text, myFixture.editor.document.text)
+    }
+
+    fun `test Reformat Code leaves dot-files alone`() {
+        val text = "{a:1}"
+        myFixture.configureFromExistingVirtualFile(myFixture.addFileToProject(".hidden.jsonnet", text).virtualFile)
+        reformat()
+        assertEquals(text, myFixture.editor.document.text)
+    }
+
+    fun `test the vendor exclusion can be turned off`() {
+        CodeStyle.runWithLocalSettings(project, CodeStyle.getSettings(project)) { settings ->
+            settings.getCustomSettings(JsonnetCodeStyleSettings::class.java).SKIP_VENDOR_AND_DOTFILES = false
+            myFixture.configureFromExistingVirtualFile(myFixture.addFileToProject("vendor/y.libsonnet", "{a:1}").virtualFile)
+            reformat()
+            assertEquals("{ a: 1 }\n", myFixture.editor.document.text)
+        }
+    }
+
+    // --- item 18: the other entry points ---
+
+    fun `test several ranges format only those ranges`() {
+        // "Only changed text" hands the VCS ranges over; the middle line is not in any of them.
+        val text = "local a = {x:1,   y:2};\nlocal b = {x:1,   y:2};\nlocal c = {x:1,   y:2};\n{a:a,b:b,c:c}\n"
+        myFixture.configureByText("a.jsonnet", text)
+        val second = text.indexOf("local b")
+        val third = text.indexOf("local c")
+        val ranges = arrayOf(TextRange(0, second - 1), TextRange(third, text.indexOf("{a:a") - 1))
+        ReformatCodeProcessor(myFixture.file, ranges).run()
+        myFixture.checkResult(
+            "local a = { x: 1, y: 2 };\nlocal b = {x:1,   y:2};\nlocal c = { x: 1, y: 2 };\n{a:a,b:b,c:c}\n",
+        )
+    }
+
+    fun `test reformat of a directory covers the jsonnet files and skips vendor`() {
+        val a = myFixture.addFileToProject("env/a.jsonnet", "{a:1}")
+        val b = myFixture.addFileToProject("env/lib/b.libsonnet", "{b:2}")
+        val v = myFixture.addFileToProject("env/vendor/v.libsonnet", "{v:3}")
+        val other = myFixture.addFileToProject("env/notes.txt", "{c:4}")
+        ReformatCodeProcessor(project, a.parent, true, false).run()
+        assertEquals("{ a: 1 }\n", a.text)
+        assertEquals("{ b: 2 }\n", b.text)
+        assertEquals("{v:3}", v.text)
+        assertEquals("{c:4}", other.text)
+    }
+
+    fun `test Reformat File with optimize imports`() {
+        // No import optimizer is registered (sorting is part of jsonnetfmt), so this must simply reformat.
+        myFixture.configureByText("a.jsonnet", "local b = import 'b.libsonnet';\nlocal a = import 'a.libsonnet';\n{a:a,b:b}\n")
+        OptimizeImportsProcessor(ReformatCodeProcessor(myFixture.file, false)).run()
+        myFixture.checkResult("local a = import 'a.libsonnet';\nlocal b = import 'b.libsonnet';\n{ a: a, b: b }\n")
+    }
+
+    fun `test reformat on save`() {
+        // The platform's on-save action needs a real frame (it runs from a coroutine off saveAllDocuments, which does
+        // nothing here), so this replays what FormatOnSaveAction does: skip files that don't allow auto-format, then run
+        // a ReformatCodeProcessor over the saved files.
+        myFixture.configureByText("a.jsonnet", "{a:1}")
+        assertTrue(com.intellij.lang.LanguageFormatting.INSTANCE.isAutoFormatAllowed(myFixture.file))
+        ReformatCodeProcessor(project, arrayOf(myFixture.file), null, false).run()
+        assertEquals("{ a: 1 }\n", myFixture.editor.document.text)
+    }
+
+    fun `test a file the port rejects is left alone and the user is told`() {
+        // Duplicate fields are fine for our PSI parser but go-jsonnet's parser refuses them.
+        val text = "{a:1,a:2}"
+        myFixture.configureByText("a.jsonnet", text)
+        assertFalse(com.intellij.psi.util.PsiTreeUtil.hasErrorElements(myFixture.file))
+        val notifications = mutableListOf<Notification>()
+        project.messageBus.connect(testRootDisposable).subscribe(Notifications.TOPIC, object : Notifications {
+            override fun notify(notification: Notification) {
+                notifications += notification
+            }
+        })
+        reformat()
+        assertEquals(text, myFixture.editor.document.text)
+        val ours = notifications.filter { it.groupId == "Jsonnet" }
+        assertEquals(notifications.toString(), 1, ours.size)
+        assertTrue(ours[0].title, ours[0].title.startsWith("Can't format"))
     }
 }

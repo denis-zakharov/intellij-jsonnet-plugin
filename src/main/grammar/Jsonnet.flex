@@ -21,7 +21,9 @@ LINE_COMMENT="//"[^\r\n]*|"#"[^\r\n]*
 BLOCK_COMMENT="/*"([^*]|\*+[^*/])*\*+"/"
 
 DIGIT=[0-9]
-NUMBER={DIGIT}+(\.{DIGIT}+)?([eE][+-]?{DIGIT}+)?
+// jsonnet >= 0.20 allows `_` between digits (1_000, 1_0.5_0e1_0), never leading/trailing a digit run.
+DIGITS={DIGIT}+(_{DIGIT}+)*
+NUMBER={DIGITS}(\.{DIGITS})?([eE][+-]?{DIGITS})?
 
 IDENTIFIER=[a-zA-Z_][a-zA-Z0-9_]*
 

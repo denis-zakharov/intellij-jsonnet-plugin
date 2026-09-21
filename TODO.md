@@ -315,42 +315,41 @@ jsonnetfmt toggles; default indent 2. Checked against the real `jsonnetfmt` over
 mismatches, plus upstream and hand-written goldens. Details, quirks kept on purpose and the test recipe: AGENTS.md
 "Formatter". Follow-ups: items 15-22.
 
-### 15. Block-model (typing) indentation that agrees with `jsonnetfmt` (plan phase 4, not started)
-Enter, typed `}`/`]`/`)`, paste and files with syntax errors still use the v1 `JsonnetBlock` rules (fixed nesting, no
-hanging alignment, no `then`/`else`/binary-operator/`local` continuation rules). Full plan: "B. Block model" in
-`formatter-plan.md`. Sub-items, in priority order:
-- Rewrite the indent rules after `FixIndentation` (`Indent` + `Alignment`; align to the first element's column when it
-  shares the opener's line, else `base + indent`) and make `getChildAttributes` right for *incomplete* constructs
-  (`{ a: 1,⏎`, `f(a,⏎`, `local x =⏎`, `if c then⏎`, `a +⏎`).
-- Consistency harness: for every jsonnetfmt-canonical file (goldens + corpus output) strip one line's indent, ask
-  `CodeStyleManager.adjustLineIndent` for it back, compare; track the match rate over non-comment lines and only leave
-  documented deviations. Write it first and expect it to fail for real reasons.
-- Make `(`...`)` a structural pair in `JsonnetBraceMatcher` so a typed `)` re-indents like `}`/`]`; check single-line calls.
-- Rebase `jsonnetSpacingBuilder` on the unparser's spacing (`{ a }`, `[a]`, `f(x)`, `a.b`, unary ops, `:`/`::`/`+:`, keep
-  line breaks); the current `before(LBRACK)`/`before(LPAREN)` rules have never been exercised.
-- Enter inside a `|||` text block (one multi-line token, so the Block model isn't consulted): check the caret's indent, add an
-  `EnterHandlerDelegate` if it isn't the previous line's. Also check Enter on `//`/`#` lines and between `{|}`.
+### 15. ~~Block-model (typing) indentation that agrees with `jsonnetfmt`~~ — DONE (residual shapes below)
+`JsonnetBlock` was rewritten after `FixIndentation` (Alignment + Indent, `getChildAttributes` for incomplete constructs,
+context-aware spacing from the unparser's rules); details and the IntelliJ pitfalls found: AGENTS.md "Block model".
+- **Consistency harness** `JsonnetTypingConsistencyTest`: strips each line's indent from jsonnetfmt-canonical text, asks
+  `adjustLineIndent`, compares. Upstream + oracle corpus: 415/435 (95.4%, floor 95%); with go-jsonnet's `cpp-jsonnet/examples` +
+  `case_studies` (`JSONNET_TYPING_CORPUS=dirA:dirB`): 3433/3472 (98.9%). Misses are written to `build/typing-consistency.txt`.
+  Remaining shapes, all deliberate: the port's "strong indent" (`f(a,⏎ b {` / `x + y⏎ + z {` — later lines are based on a
+  column, not the line), UTF-8 byte columns in hanging alignment (`unicode_hanging_indent`), a comment before a comma, and the
+  bizarre layouts in `cpp_formatting_braces3`.
+- `JsonnetTypingTest`: Enter after `{ a: 1,` / `[1,` / `f(a,` / `local x =` / `local a = 1,` / `if c then` / `else` / `a +` / `a:`,
+  between `{}`, `[]`, `()`, after `//` comments and inside `|||` blocks (the platform already keeps the previous line's indent
+  there), typed `}` `]` `)`. Needed a grammar change: `objectLiteral`/`arrayLiteral`/`binaryTail`/`elseBranch`/`moreBind` are
+  pinned so incomplete code keeps its structure.
+- `(`...`)` is structural in `JsonnetBraceMatcher`; `JsonnetTypedHandler` re-indents typed `}`/`]`/`)` from the PSI (the platform
+  hard-codes `}` and `)` and does nothing for `]`); `JsonnetEnterBetweenBracesDelegate` extends Enter-between-braces to `[]`/`()`.
+- Not done: strong-indent shapes above; `Wrap`-based line breaking (jsonnetfmt keeps the user's breaks and so do we).
 
-### 16. PSI lexer/grammar: digit separators (`1_000`)
-jsonnet >= 0.20 / go-jsonnet accept `1_000`, `1_0.5_0e1_0`; our `Jsonnet.flex` lexes `1` then an identifier, so such files get
-error elements (no highlighting sanity, unresolved-reference noise) and never reach `JsonnetFormattingService` (they fall back
-to the Block formatter). Fix the lexer, add a `JsonnetLexerTest` case, and then add a platform test that a whitespace-only
-reformat of `{a:1_000}` is refused (today only the guard, `JsonnetTextEdits.sameApartFromWhitespace`, is unit-tested).
-Check sjsonnet's own support before promising evaluation.
+### 16. ~~PSI lexer/grammar: digit separators (`1_000`)~~ — DONE
+`Jsonnet.flex` accepts `_` between digits (`1_000`, `1_0.5_0e1_0`); lexer, parser and engine (sjsonnet evaluates `1_000` as 1000)
+tests added, and `JsonnetFormattingServiceTest` pins that a whitespace-only reformat of `{a:1_000}` is refused (the port would write
+`1000`) while a normal one rewrites it.
 
-### 17. Reformat must not touch `vendor/` (and dotfiles) by default
-`tk fmt` excludes `**/.*`, `.*`, `**/vendor/**`, `vendor/**`. The IDE formats whatever the user asks, including
-reformat-on-save and "Reformat directory" inside a Tanka `vendor/`. Decide: skip vendor files in
-`JsonnetFormattingService.formatDocument` (and how to do it without falling through to the Block model, which would
-still format them), or leave explicit reformat alone and skip only implicit paths. Reuse the vendor test from
-`JsonnetStubIndexUtil` / `TankaJpath`.
+### 17. ~~Reformat must not touch `vendor/` (and dotfiles) by default~~ — DONE
+`JsonnetFormattingService.formatDocument` does nothing for files `JsonnetFormatExclusions` matches (a dot-file, a dot-directory or
+a `vendor` directory *below the project root*), like `tk fmt`. It is handled inside the service, not via `canFormat`, because
+declining would hand the file to the Block-model formatter, which would reformat it. Setting: Code Style > Jsonnet > Other >
+"Don't reformat vendor/ and dot-files" (`SKIP_VENDOR_AND_DOTFILES`, default on). It applies to every explicit request, single
+file included; turn the option off to format a vendored file on purpose.
 
-### 18. Verify the formatting entry points that only the Reformat Code action covers today
-`JsonnetFormattingServiceTest` exercises `CodeStyleManager.reformat`, `reformatText` (selection) and the Reformat Code action.
-Not tested yet: Actions on Save > Reformat code (`FormatOnSaveAction`), Reformat File dialog options ("only changed text" via
-VCS ranges -> `formatRanges` with several ranges), reformat of a directory, optimize-imports-with-reformat, and the
-"Can't format" balloon shown when the port rejects a PSI-valid file (e.g. duplicate field or local, which go-jsonnet's parser
-rejects but our PSI accepts). Add tests for each and fix what they turn up.
+### 18. ~~Verify the formatting entry points that only the Reformat Code action covers today~~ — DONE
+`JsonnetFormattingServiceTest` now covers: several ranges (`ReformatCodeProcessor(file, ranges)` — what "only changed text" hands
+over), directory reformat (skips `vendor/` and non-Jsonnet files), Reformat File + Optimize Imports (no optimizer is registered;
+sorting is part of the formatter), the reformat-on-save processor path, and the "Can't format" notification for a PSI-valid file
+the port rejects (`{a:1,a:2}`). Reformat-on-save itself (`ActionsOnSaveManager`) needs a real frame and is replayed via the
+processor `FormatOnSaveAction` builds; check the real thing in item 19.
 
 ### 19. Manual pass in a real IDE
 `./gradlew runIde`: Ctrl+Alt+L on a real Tanka environment and on k8s-libsonnet files, compare with `tk fmt --stdout`; check

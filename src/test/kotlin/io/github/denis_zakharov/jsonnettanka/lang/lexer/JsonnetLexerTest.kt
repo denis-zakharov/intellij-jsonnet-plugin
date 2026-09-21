@@ -102,4 +102,18 @@ class JsonnetLexerTest {
         val tokens = tokenize("|||\n  hello\n")
         assertEquals(listOf(JsonnetTypes.OROR, JsonnetTypes.PIPE, JsonnetTypes.IDENTIFIER), tokens.map { it.first })
     }
+
+    @Test
+    fun `digit separators stay inside one number token`() {
+        for (n in listOf("1_000", "1_0.5_0e1_0", "12_34_56", "1.0_1", "1e1_0", "0", "0.5")) {
+            assertEquals(listOf(JsonnetTypes.NUMBER to n), tokenize(n), n)
+        }
+    }
+
+    @Test
+    fun `a separator must sit between digits`() {
+        // Not part of the number: `1_` is a number followed by an identifier, exactly as before the separators existed.
+        assertEquals(listOf(JsonnetTypes.NUMBER, JsonnetTypes.IDENTIFIER), tokenize("1_").map { it.first })
+        assertEquals(listOf(JsonnetTypes.NUMBER, JsonnetTypes.DOT, JsonnetTypes.IDENTIFIER), tokenize("1._5").map { it.first })
+    }
 }

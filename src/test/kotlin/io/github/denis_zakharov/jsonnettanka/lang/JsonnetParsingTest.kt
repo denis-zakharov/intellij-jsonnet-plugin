@@ -104,6 +104,10 @@ class JsonnetParsingTest : ParsingTestCase("", "jsonnet", JsonnetParserDefinitio
         assertNoErrors("{ a: 1 } { b: 2 }")
     }
 
+    fun `test digit separators parse without errors`() {
+        assertNoErrors("{ a: 1_000, b: 1_0.5_0e1_0 }")
+    }
+
     fun `test dollar field reference`() {
         assertNoErrors("{ tags: [1], root: \$.tags }")
     }

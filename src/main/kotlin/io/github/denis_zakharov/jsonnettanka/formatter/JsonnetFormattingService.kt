@@ -44,6 +44,12 @@ class JsonnetFormattingService : AbstractDocumentFormattingService() {
         val file = formattingContext.containingFile
         val settings = formattingContext.codeStyleSettings
         val custom = settings.getCustomSettings(JsonnetCodeStyleSettings::class.java)
+        // Handled here (not in canFormat) on purpose: declining would hand the file to the Block-model formatter,
+        // which would happily reformat it.
+        if (custom.SKIP_VENDOR_AND_DOTFILES) {
+            val path = file.originalFile.virtualFile?.path
+            if (path != null && JsonnetFormatExclusions.isExcluded(path, file.project.basePath)) return
+        }
         val indent = settings.getIndentOptionsByFile(file).INDENT_SIZE
         val options = if (canChangeWhiteSpaceOnly) custom.toWhitespaceOnlyOptions(indent) else custom.toOptions(indent)
 

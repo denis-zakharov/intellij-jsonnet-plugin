@@ -87,7 +87,13 @@ expr ::= binaryExpr
 // a per-precedence nested binary tree (see plan notes) — good enough for
 // syntax highlighting, navigation and refactoring at the statement level;
 // revisit if a future phase needs sub-expression-precise structural editing.
-private binaryExpr ::= unaryExpr (binOp unaryExpr)*
+private binaryExpr ::= unaryExpr binaryTail*
+
+// pin=1: `a +` (the operand still being typed) stays one expression with an error inside, instead of leaving the
+// operator dangling outside it — the Block-model formatter needs the structure to indent the next line.
+private binaryTail ::= binOp unaryExpr {
+  pin=1
+}
 
 private binOp ::= OROR | ANDAND | PIPE | CARET | AMP | EQEQ | NEQ | LTE | GTE | SHL | SHR | LT | GT
                  | IN_KW | PLUS | MINUS | STAR | SLASH | PERCENT
@@ -148,7 +154,11 @@ parenExpr ::= LPAREN expr RPAREN {
   pin=1
 }
 
-localExpr ::= LOCAL_KW bind (COMMA bind)* SEMI expr {
+localExpr ::= LOCAL_KW bind moreBind* SEMI expr {
+  pin=1
+}
+
+private moreBind ::= COMMA bind {
   pin=1
 }
 
@@ -172,7 +182,11 @@ param ::= IDENTIFIER (ASSIGN expr)? {
   mixin="io.github.denis_zakharov.jsonnettanka.lang.psi.impl.JsonnetParamMixin"
 }
 
-ifExpr ::= IF_KW expr THEN_KW expr (ELSE_KW expr)? {
+ifExpr ::= IF_KW expr THEN_KW expr elseBranch? {
+  pin=1
+}
+
+private elseBranch ::= ELSE_KW expr {
   pin=1
 }
 
@@ -194,7 +208,11 @@ errorExpr ::= ERROR_KW expr {
   pin=1
 }
 
-objectLiteral ::= LBRACE objectBody? RBRACE
+// pin=1 on both literals: an unclosed `{`/`[` is still a literal (with a missing-closer error), which is what
+// lets typing inside it — Enter after `{ a: 1,` — be indented from the structure.
+objectLiteral ::= LBRACE objectBody? RBRACE {
+  pin=1
+}
 
 private objectBody ::= objectComprehension | objectMemberList
 
@@ -234,7 +252,9 @@ objectComprehension ::= (objectLocal COMMA)* computedFieldName COLON expr forSpe
   pin=5
 }
 
-arrayLiteral ::= LBRACK arrayBody? RBRACK
+arrayLiteral ::= LBRACK arrayBody? RBRACK {
+  pin=1
+}
 
 private arrayBody ::= arrayComprehension | arrayMemberList
 
