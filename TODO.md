@@ -251,7 +251,9 @@ written against the code, including an explicit *Limitations* section.
   3. **`./gradlew verifyPlugin` across the recommended IDEs** (GoLand, IU, …).
      Dropping the Java dependency makes them plausible targets but they have
      not been run; README states this.
-  4. Signing / `publishPlugin` credentials, and a `<vendor url>` if wanted.
+  4. Signing / `publishPlugin` credentials, and a `<vendor url>` if wanted. The pipeline is wired
+     (`intellijPlatform { signing; publishing }` in `build.gradle.kts`, `.github/workflows/release.yml`);
+     what a human still has to do is listed in `docs/publishing.md`.
 
 ### 12. ~~Flag sjsonnet-only std functions (they fail under `tk`)~~ — DONE
 `JsonnetSjsonnetOnlyStdInspection` (warning, on by default) flags `std.regexFullMatch`,

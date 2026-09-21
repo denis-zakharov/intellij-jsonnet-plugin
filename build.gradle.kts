@@ -64,6 +64,23 @@ intellijPlatform {
             recommended()
         }
     }
+
+    // Release credentials come from the environment (GitHub Actions secrets, see
+    // .github/workflows/release.yml), never from the repo. Without them `signPlugin`
+    // is skipped and `publishPlugin` has no token, so local builds are unaffected.
+    signing {
+        certificateChain.set(providers.environmentVariable("CERTIFICATE_CHAIN"))
+        privateKey.set(providers.environmentVariable("PRIVATE_KEY"))
+        password.set(providers.environmentVariable("PRIVATE_KEY_PASSWORD"))
+    }
+
+    publishing {
+        token.set(providers.environmentVariable("PUBLISH_TOKEN"))
+        // 0.2.0 -> "default"; 0.2.0-beta.1 -> "beta" (a pre-release channel, not offered to everyone).
+        channels.set(
+            providers.gradleProperty("pluginVersion").map { listOf(it.substringAfter('-', "").substringBefore('.').ifEmpty { "default" }) },
+        )
+    }
 }
 
 // Grammar-Kit codegen: generate lexer (JFlex) + parser/PSI (BNF) into a
