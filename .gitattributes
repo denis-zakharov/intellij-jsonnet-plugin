@@ -1,0 +1,2 @@
+# Formatter fixtures must keep their bytes (one upstream input is CRLF on purpose).
+src/test/resources/fmt/** -text
