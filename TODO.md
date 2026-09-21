@@ -222,7 +222,7 @@ directions, panel wiring).
   refreshes on focus change / toolbar, not on every keystroke.
 - **Not visually verified** (no `runIde`). Not a rendered diagram — see item 8.
 
-### 8. Full `DiagramProvider`-based import graph
+### 8. ~~Full `DiagramProvider`-based import graph~~ — CLOSED (not built; item 7's Imports tool window is accepted as sufficient)
 The originally-scoped Phase 5 item, if item 7 turns out insufficient. Needs
 a session that can actually run `./gradlew runIde` and look at the result —
 don't attempt this blind again.
