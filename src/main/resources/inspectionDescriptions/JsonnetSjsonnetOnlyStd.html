@@ -1,0 +1,13 @@
+<html>
+<body>
+Reports calls to <code>std</code> functions that the plugin's preview engine (sjsonnet) provides but go-jsonnet,
+which Tanka runs, does not: <code>regexFullMatch</code>, <code>regexPartialMatch</code>, <code>regexGlobalReplace</code>,
+<code>regexReplace</code> and <code>regexQuoteMeta</code>.
+<p>
+Such code previews fine and then fails under <code>tk show</code> with <code>Field does not exist</code>.
+Tanka's own natives (<code>std.native('regexMatch')</code>, <code>regexSubst</code>, <code>escapeStringRegex</code>) are
+the portable alternatives; the warning says which one fits.
+</p>
+<p>Only direct <code>std.name</code> accesses are checked, and files under <code>vendor/</code> are skipped.</p>
+</body>
+</html>

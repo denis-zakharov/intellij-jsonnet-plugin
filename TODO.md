@@ -248,14 +248,24 @@ written against the code, including an explicit *Limitations* section.
      not been run; README states this.
   4. Signing / `publishPlugin` credentials, and a `<vendor url>` if wanted.
 
-### 12. Flag sjsonnet-only std functions (they fail under `tk`)
-sjsonnet ships `std.regexFullMatch`, `regexPartialMatch`, `regexGlobalReplace`,
-`regexReplace` and `regexQuoteMeta`; go-jsonnet v0.22 has none of them. Code
-using them previews fine, then fails in `tk show` — the opposite of the usual
-gap, and silent. A weak-warning inspection on `std.<those>` (Tanka's own
-`regexMatch`/`regexSubst` natives are the portable equivalents) would close it.
-Re-check the list with `scripts/sjsonnet-conformance.py` first; go-jsonnet may
-have added them since.
+### 12. ~~Flag sjsonnet-only std functions (they fail under `tk`)~~ — DONE
+`JsonnetSjsonnetOnlyStdInspection` (warning, on by default) flags `std.regexFullMatch`,
+`regexPartialMatch`, `regexGlobalReplace`, `regexReplace` and `regexQuoteMeta` — the
+only members sjsonnet has and go-jsonnet v0.22 lacks, re-measured by diffing
+`std.objectFieldsAll(std)` from both. The message names the portable Tanka native
+where there is one (`regexMatch`, `regexSubst`, `escapeStringRegex`), with the caveats
+(boolean only, no captures; `regexReplace`'s first-match-only has no equivalent).
+- Data in `stdlib/SjsonnetOnlyStd.kt`. `scripts/sjsonnet-conformance.py std` diffs the
+  two key sets and exits 1 if the list has drifted — run it after a sjsonnet or
+  go-jsonnet bump (it's the "re-check" this item asked for; the script had no such mode).
+- Scope is direct `std.name` only (same as std hover/completion): `std['x']` and
+  `local s = std; s.x` aren't followed; a local/parameter named `std` is left alone;
+  `vendor/` is skipped like the unused-declaration inspection.
+- No quick fix: the natives take different arguments and return booleans instead of
+  match objects, so an automatic rewrite would change behaviour.
+- Tests: `JsonnetSjsonnetOnlyStdInspectionTest` (guards for shadowing and `vendor/`
+  mutation-checked), `SjsonnetOnlyStdTest` (every entry is still a sjsonnet member and
+  really evaluates in the preview).
 
 ### 13. Re-check the "no tracing/debug hook" premise
 The "Explicitly not planned" debugger entry rested on the same shallow public-API

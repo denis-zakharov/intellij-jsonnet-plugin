@@ -15,7 +15,7 @@
             <li>Go to definition, find usages and rename for locals, parameters and fields &mdash; including <code>lib.foo.bar</code> through imports; Go to Symbol across the project</li>
             <li>Import paths resolve like Tanka does: relative to the file, then <code>main.jsonnet</code>'s directory, <code>vendor/</code> and <code>lib/</code></li>
             <li>Completion for locals, parameters, keywords, object fields (through <code>self</code>, <code>super</code>, <code>$</code>, imports and function calls) and import paths; documentation for the standard library, Tanka's native functions, the <code>tk</code> module and functions annotated with <a href="https://github.com/jsonnet-libs/docsonnet">docsonnet</a> (your own <code>lib/</code>, k8s-libsonnet, xtd)</li>
-            <li>Unresolved-reference errors (cross-checked against sjsonnet's own scope analysis), an unused local / hidden field inspection with quick fixes, parameter-name inlay hints</li>
+            <li>Unresolved-reference errors (cross-checked against sjsonnet's own scope analysis), an unused local / hidden field inspection with quick fixes, a warning for <code>std</code> functions that exist only in the preview engine (they fail under <code>tk</code>), parameter-name inlay hints</li>
             <li>Formatter, folding, structure view, brace matching, commenting</li>
         </ul>
         <h3>Evaluation</h3>
@@ -156,6 +156,14 @@
                          enabledByDefault="true"
                          level="WARNING"
                          implementationClass="io.github.denis_zakharov.jsonnettanka.inspection.JsonnetUnusedDeclarationInspection"/>
+
+        <localInspection language="Jsonnet"
+                         shortName="JsonnetSjsonnetOnlyStd"
+                         displayName="Standard library function missing from go-jsonnet"
+                         groupName="Jsonnet"
+                         enabledByDefault="true"
+                         level="WARNING"
+                         implementationClass="io.github.denis_zakharov.jsonnettanka.inspection.JsonnetSjsonnetOnlyStdInspection"/>
 
         <toolWindow id="Jsonnet Preview"
                     anchor="right"

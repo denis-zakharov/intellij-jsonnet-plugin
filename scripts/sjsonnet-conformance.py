@@ -6,6 +6,7 @@ docs/sjsonnet-gaps.md and the extension in src/main/kotlin/.../engine/extension/
 
   scripts/sjsonnet-conformance.py testdata --go-jsonnet ~/go/pkg/mod/github.com/google/go-jsonnet@v0.22.0
   scripts/sjsonnet-conformance.py params   --go-jsonnet ~/src/google/go-jsonnet
+  scripts/sjsonnet-conformance.py std
 
 Needs `jsonnet` (go-jsonnet) on PATH and `./gradlew :shaded-sjsonnet:shadowJar` run once. It drives the
 shaded jar's own CLI, i.e. *stock* sjsonnet — the plugin's extension is not in play here on purpose;
@@ -14,6 +15,8 @@ the extension is covered by TankaNativesTest / StdExtrasTest.
 `testdata`  Runs every testdata/*.jsonnet through both and buckets the outcome. Only the buckets that
             indicate a gap are listed: go succeeds but sjsonnet fails / differs, or sjsonnet accepts
             what go rejects. Both failing is agreement (error *text* is not compared).
+`std`       Diffs the two `std` key sets and checks the sjsonnet-only ones against SjsonnetOnlyStd.kt (what the
+            inspection flags). Exits 1 on drift; needs no go-jsonnet checkout.
 `params`    For every std function, calls it with each of go's parameter names as a named argument and
             reports the names sjsonnet rejects that the real `jsonnet` accepts (needs go-jsonnet's
             cpp-jsonnet submodule for stdlib/std.jsonnet).
@@ -112,13 +115,37 @@ def cmd_params(args):
     print(f"{len(found)} functions differ; mirror them in StdExtras.goParameterNames")
 
 
+def std_keys(cmd):
+    """Public std members (internal `__x`/`$x` helpers dropped) as reported by std.objectFieldsAll(std)."""
+    with tempfile.NamedTemporaryFile("w", suffix=".jsonnet", delete=False) as f: f.write("std.objectFieldsAll(std)")
+    try:
+        code, out, err = run(cmd + [f.name])
+        if code != 0: sys.exit(f"{cmd[0]} failed: {err}")
+        return {k for k in json.loads(out) if not k.startswith(("__", "$"))}
+    finally: os.unlink(f.name)
+
+
+def cmd_std(args):
+    go, sj = std_keys(["jsonnet"]), std_keys(sjsonnet_cmd(args.jar))
+    src = open(os.path.join(ROOT, "src/main/kotlin/io/github/denis_zakharov/jsonnettanka/stdlib/SjsonnetOnlyStd.kt")).read()
+    flagged = set(re.findall(r'Entry\(\s*"(\w+)"', src))
+    only_sj, only_go = sj - go, go - sj
+    print(f"sjsonnet-only ({len(only_sj)}): {sorted(only_sj)}")
+    print(f"go-only ({len(only_go)}): {sorted(only_go)}  (StdExtras backfills `id`; anything else needs a look)")
+    unflagged, stale = only_sj - flagged, flagged - only_sj
+    if unflagged: print(f"NOT flagged by the inspection, add to SjsonnetOnlyStd.kt: {sorted(unflagged)}")
+    if stale: print(f"flagged but go-jsonnet has them (or sjsonnet dropped them), remove from SjsonnetOnlyStd.kt: {sorted(stale)}")
+    sys.exit(1 if unflagged or stale else 0)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("mode", choices=["testdata", "params"])
-    ap.add_argument("--go-jsonnet", required=True, help="go-jsonnet checkout (params) or module dir containing testdata/")
+    ap.add_argument("mode", choices=["testdata", "params", "std"])
+    ap.add_argument("--go-jsonnet", help="go-jsonnet checkout (params) or module dir containing testdata/")
     ap.add_argument("--jar", default=os.path.join(ROOT, "shaded-sjsonnet/build/libs/shaded-sjsonnet.jar"))
     ap.add_argument("--jobs", type=int, default=8)
     a = ap.parse_args()
-    a.go_jsonnet = os.path.expanduser(a.go_jsonnet)
+    if a.mode != "std" and not a.go_jsonnet: ap.error("--go-jsonnet is required for " + a.mode)
+    a.go_jsonnet = os.path.expanduser(a.go_jsonnet or "")
     if not os.path.exists(a.jar): sys.exit(f"missing {a.jar}; run ./gradlew :shaded-sjsonnet:shadowJar")
-    {"testdata": cmd_testdata, "params": cmd_params}[a.mode](a)
+    {"testdata": cmd_testdata, "params": cmd_params, "std": cmd_std}[a.mode](a)

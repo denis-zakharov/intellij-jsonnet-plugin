@@ -31,6 +31,15 @@ strings) rather than sjsonnet's YAML 1.1; regexes are RE2 on both sides (sjsonne
 `manifestYamlFromJson` reimplements yaml.v3's layout (4-space indent, its quirky nesting inside sequence
 items, quoting rules, `%g` numbers, natural key order) because no JVM YAML library emits it.
 
+## Flagged, not fixed
+
+| Difference | What the plugin does |
+|---|---|
+| sjsonnet has extras go-jsonnet v0.22 lacks: `std.regexFullMatch`, `regexPartialMatch`, `regexGlobalReplace`, `regexReplace`, `regexQuoteMeta`. Code using them previews fine but fails under `tk` with `Field does not exist` | `JsonnetSjsonnetOnlyStdInspection` (a warning, on by default) flags direct `std.<name>` uses and names the portable Tanka native where one exists (`regexMatch`, `regexSubst`, `escapeStringRegex`; none replaces only the first match, and none returns captures). The list is `SjsonnetOnlyStd`; `scripts/sjsonnet-conformance.py std` diffs both `std` key sets and reports drift |
+
+Removing the functions instead would break code that runs fine in sjsonnet-based tools, and shadowing them with
+erroring stubs would make the preview *less* useful than `tk` is. A warning keeps the preview honest about what will ship.
+
 ## Not closed
 
 | Difference | Why it stays |
@@ -39,7 +48,6 @@ items, quoting rules, `%g` numbers, natural key order) because no JVM YAML libra
 | `std.native(x=...)` (go names the parameter `x`, sjsonnet `name`) | `StdLibModule` appends `native` after merging the extras, so it can't be replaced |
 | `helmTemplate`, `kustomizeBuild` natives | Shell out to external binaries even in Tanka; `std.native` returns `null` for them in the preview. Use the `tk` run configurations |
 | sjsonnet accepts what go rejects: `std.base64` of code points above 255; recursion that go stops at 500 frames (`std.makeArray_recursive_evalutation_order_matters`) | Being more permissive can't produce a wrong preview of valid code, only miss an error |
-| sjsonnet has extras go-jsonnet v0.22 lacks: `std.regexFullMatch`, `regexPartialMatch`, `regexGlobalReplace`, `regexReplace`, `regexQuoteMeta` | Code using them previews fine but fails under `tk`. Worth an inspection if it bites |
 | Linter (`jsonnet-lint`) and formatter | Not evaluator features; the plugin has its own inspections and formatter |
 
 ## Method

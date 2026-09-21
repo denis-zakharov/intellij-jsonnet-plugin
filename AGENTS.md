@@ -147,6 +147,8 @@ ecosystem at all — see the plan doc).
   it the same way (run `tk` first, then paste). `docs/sjsonnet-gaps.md` is the
   full sjsonnet-vs-go-jsonnet comparison (what's closed, what isn't and why);
   `scripts/sjsonnet-conformance.py` regenerates it after a version bump.
+  The five sjsonnet-only `std.regex*` functions are flagged by `JsonnetSjsonnetOnlyStdInspection`
+  (list: `stdlib/SjsonnetOnlyStd.kt`); `scripts/sjsonnet-conformance.py std` reports drift from it.
 - **`std`'s own functions are hidden fields.** `Val$Obj.visibleKeyNames()`
   returns *empty* for the default std object — std's own 170-ish functions
   are internally `::`-hidden, matching how real Jsonnet's `std.jsonnet`

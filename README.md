@@ -17,7 +17,8 @@ newer. It depends only on the platform and the bundled JSON module — see [Comp
   directory, `vendor/` and `lib/` under the `jsonnetfile.json` root.
 - Completion and quick documentation for the standard library, Tanka's native functions and the `tk` module.
 - Errors for unresolved references (cross-checked against sjsonnet's own scope analysis), an inspection
-  for unused locals and hidden fields with quick fixes, parameter-name inlay hints.
+  for unused locals and hidden fields with quick fixes, a warning for `std` functions that only the preview
+  engine has (they'd fail under `tk`), parameter-name inlay hints.
 - Formatter, folding, structure view, brace matching, commenting.
 
 **Evaluation** (all in-process)
