@@ -129,4 +129,46 @@ class JsonnetTypingTest : BasePlatformTestCase() {
         assertTrue(out, out.contains("a: [1, 2],"))
         assertTrue(out, out.contains("b: { c: 1 }"))
     }
+
+    // --- item 22: quotes and comments ---
+
+    fun `test a typed single quote is closed`() = typeChar("{ a: <caret> }", '\'', "{ a: '<caret>' }")
+
+    fun `test a typed double quote is closed`() = typeChar("{ a: <caret> }", '"', "{ a: \"<caret>\" }")
+
+    fun `test a closing quote is typed over`() = typeChar("{ a: 'x<caret>' }", '\'', "{ a: 'x'<caret> }")
+
+    fun `test a quote after a word character is not paired`() = typeChar("{ a: x<caret> }", '\'', "{ a: x'<caret> }")
+
+    fun `test a quote typed in a comment is not paired`() = typeChar("// it<caret>", '\'', "// it'<caret>")
+
+    fun `test a single quote typed inside a double-quoted string is not paired`() =
+        typeChar("{ a: \"it<caret>\" }", '\'', "{ a: \"it'<caret>\" }")
+
+    fun `test Backspace on an opening quote removes the pair`() {
+        myFixture.configureByText("a.jsonnet", "{ a: '<caret>' }")
+        myFixture.type('\b')
+        assertEquals("{ a: <caret> }", current())
+    }
+
+    fun `test Enter in a line comment continues it`() =
+        enter("// first<caret> second", "// first\n// <caret>second")
+
+    fun `test Enter at the end of a line comment does not add a prefix`() =
+        enter("// first<caret>", "// first\n<caret>")
+
+    fun `test Enter in a hash comment continues it with a hash`() =
+        enter("# first<caret> second", "# first\n# <caret>second")
+
+    fun `test Enter in a block comment is left to the platform`() =
+        enter("/* first<caret> // second */", "/* first\n <caret>// second */")
+
+    fun `test Enter in a trailing comment continues it`() =
+        enter("{ a: 1, // first<caret>second\n}", "{ a: 1, // first\n  // <caret>second\n}")
+
+    fun `test the same quotes work in a libsonnet file`() {
+        myFixture.configureByText("a.libsonnet", "{ a: <caret> }")
+        myFixture.type('\'')
+        assertEquals("{ a: '<caret>' }", current())
+    }
 }

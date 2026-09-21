@@ -382,9 +382,16 @@ below where this matters, and the synchronous path keeps undo/caret handling sim
   `--no-pad-objects --no-use-implicit-plus`): no new mismatches. The differential test no longer excludes
   `error.parse.deep_array_nesting.jsonnet` (item 20's bigger stack makes the port format it like jsonnetfmt).
 
-### 22. Adjacent typing niceties (not formatting proper)
-No `QuoteHandler` is registered (typing `'` or `"` doesn't auto-close), and `//` comment continuation on Enter is unverified.
-Small, separately testable; do them together with item 15 if the typing tests are being written anyway.
+### 22. ~~Adjacent typing niceties (not formatting proper)~~ — DONE
+- **Quotes**: `JsonnetQuoteHandler` (registered for both `Jsonnet` and `Libsonnet` file types) pairs `'`/`"`, types over the closing
+  one, doesn't pair after a word character (`it's`), in comments or inside the other kind of string; Backspace on `'|'` removes
+  both. The lexer has no unterminated-string token — a fresh lone quote is a `BAD_CHARACTER` — so `isOpeningQuote` /
+  `hasNonClosedLiteral` treat that as the opening quote. Text blocks and `@'..'` aren't paired.
+- **Comments**: it was *not* a platform default — Enter in the middle of `// a b` gave no continuation. `JsonnetEnterInLineCommentHandler`
+  continues `//` and `#` comments (the platform's own handler needs a `CodeDocumentationAwareCommenter`, and line and block
+  comments are one `COMMENT` token, so it would have inserted `//` into `/* */`). Enter at the end of a comment and in a block
+  comment stays the platform's. Tests in `JsonnetTypingTest` ("item 22").
+- Not done: `*` continuation inside `/* */`.
 
 ## Explicitly not planned (revisit only if the premise changes)
 

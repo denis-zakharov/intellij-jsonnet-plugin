@@ -75,6 +75,11 @@
             language="Jsonnet"
             implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetEnterBetweenBracesDelegate"/>
 
+        <enterHandlerDelegate implementation="io.github.denis_zakharov.jsonnettanka.editor.JsonnetEnterInLineCommentHandler"/>
+
+        <quoteHandler fileType="Jsonnet" className="io.github.denis_zakharov.jsonnettanka.editor.JsonnetQuoteHandler"/>
+        <quoteHandler fileType="Libsonnet" className="io.github.denis_zakharov.jsonnettanka.editor.JsonnetQuoteHandler"/>
+
         <lang.commenter
             language="Jsonnet"
             implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetCommenter"/>
