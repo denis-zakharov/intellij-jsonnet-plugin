@@ -121,6 +121,44 @@ class JsonnetFormattingServiceTest : BasePlatformTestCase() {
         assertEquals("{ a".length, JsonnetTextEdits.mapOffset(original, edits, "{a".length)) // right after `a`
     }
 
+    // --- item 20: limits ---
+
+    private val diffGivesUp: (String, String) -> List<com.intellij.diff.fragments.LineFragment> =
+        { _, _ -> throw com.intellij.diff.comparison.DiffTooBigException() }
+
+    fun `test a diff that gives up becomes one edit around the common prefix and suffix`() {
+        val original = "{a:1,\nb:2}"
+        val formatted = "{ a: 1, b: 3 }"
+        val edits = JsonnetTextEdits.compute(original, formatted, diffGivesUp)
+        assertEquals(1, edits.size)
+        val e = edits.single()
+        assertEquals(formatted, original.substring(0, e.start) + e.replacement + original.substring(e.end))
+    }
+
+    fun `test the whole file is still reformatted when the diff gives up`() {
+        val original = "{a:1,b:2}"
+        myFixture.configureByText("a.jsonnet", original)
+        val document = myFixture.editor.document
+        com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
+            JsonnetTextEdits.apply(document, "{ a: 1, b: 2 }\n", null, project, diffGivesUp)
+        }
+        assertEquals("{ a: 1, b: 2 }\n", document.text)
+    }
+
+    fun `test a selection is left alone when the diff gives up`() {
+        val original = "{a:1,\nb:2}"
+        myFixture.configureByText("a.jsonnet", original)
+        val document = myFixture.editor.document
+        JsonnetTextEdits.apply(document, "{ a: 1, b: 2 }\n", listOf(TextRange(0, 3)), project, diffGivesUp)
+        assertEquals(original, document.text)
+    }
+
+    fun `test deeply nested code is formatted on a bigger stack`() {
+        val depth = 20_000
+        val formatted = io.github.denis_zakharov.jsonnettanka.fmt.JsonnetFormatter.format("[".repeat(depth) + "]".repeat(depth))
+        assertTrue(formatted.startsWith("[[[[") && formatted.trimEnd().endsWith("]]]]"))
+    }
+
     fun `test a syntax error falls back to the block formatter instead of failing`() {
         val text = "{\na:1,,\n}"
         myFixture.configureByText("a.jsonnet", text)

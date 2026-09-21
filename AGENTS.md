@@ -351,13 +351,19 @@ ecosystem at all — see the plan doc).
   lexer, parser, fodder AST, passes, `FixIndentation` and unparser; `JsonnetFormatter.format(text, Options)` is the
   entry point. Our PSI is *flat* (no operator precedence), so the port has its own parser instead of reading PSI.
   Apache-2.0 headers stay on every ported file (`THIRD_PARTY_NOTICES.md` explains).
-- **The oracle is the real binary.** `JsonnetFormatterDifferentialTest` (opt-in) runs the port and `jsonnetfmt` over a
-  corpus: `JSONNETFMT_BIN=~/go/bin/jsonnetfmt JSONNETFMT_VARIANTS=all JSONNETFMT_CORPUS=dirA:dirB ./gradlew cleanTest test
-  --tests '*Differential*' -i` (`cleanTest`: Gradle doesn't treat env vars as inputs, so a bare rerun is "up to date").
-  At the time of writing: 5,885 files (k8s-libsonnet 1.34, a Tanka project, grafana/tanka, go-jsonnet testdata, ...) x 7
-  option variants, 0 mismatches. Rerun after touching `fmt/` or bumping go-jsonnet. `JsonnetFormatterGoldenTest` is the
-  always-on version: upstream goldens (34 + 1 error golden) and four hand-written cases whose goldens are `jsonnetfmt`'s
-  own output (`src/test/resources/fmt/{upstream,oracle}`).
+- **The oracle is the real binary; `scripts/jsonnetfmt-conformance.py` drives it** (`version`, `goldens [--write]`, `fetch`,
+  `differential --corpus ... --variants all`; docstring has the recipes). The ported release is pinned in one place,
+  `fmt/PortedFrom.kt`, and the script refuses a binary of another version. `JsonnetFormatterDifferentialTest` (opt-in, env
+  `JSONNETFMT_BIN`/`_CORPUS`/`_VARIANTS`; `cleanTest` because Gradle doesn't treat env vars as inputs) compares byte for byte, 10
+  option variants. At the time of writing: 3,478 files (k8s-libsonnet 1.34, a Tanka project, grafana/tanka, go-jsonnet testdata) x
+  10 variants, 0 mismatches — including the 10,000-deep array file. Opt-in CI: `.github/workflows/jsonnetfmt-differential.yml`
+  (manual + weekly; also a release-checklist step in `docs/publishing.md`). Rerun after touching `fmt/` or bumping go-jsonnet.
+  `JsonnetFormatterGoldenTest` is the always-on version: upstream goldens (34 + 1 error golden) and four hand-written cases whose
+  goldens are `jsonnetfmt`'s own output (`src/test/resources/fmt/{upstream,oracle}`; `goldens --write` regenerates the latter).
+- **`WHITESPACE_ONLY` has no oracle, so it is a property test** (`JsonnetFormatterWhitespaceOnlyTest`, also runs over
+  `JSONNETFMT_CORPUS`): same non-whitespace characters in and out. It found three canonicalizations no option turns off (go-jsonnet
+  has them too): digit separators, an empty slice step (`a[1::]` -> `a[1:]`), and `|||-` -> `|||`. The test normalizes exactly those;
+  the service's `sameApartFromWhitespace` guard is what keeps them from being applied as a "whitespace" change.
 - **Do not "fix" go-jsonnet's quirks; they are the spec.** Kept on purpose: `specs()` in `FixIndentation` visits
   `spec.expr` (not `cond.expr`) for `if` conditions; the operator lexer collapses any operator ending in `+-~!$` to its
   first char and any `/` ends an operator run; the slice parser tests `peek().data == ":"` regardless of token kind;
@@ -366,8 +372,10 @@ ecosystem at all — see the plan doc).
 - **Columns are UTF-8 byte counts** (Go `len()`): `utf8Len` in `Ast.kt`, used by `FixIndentation`. Import sorting compares
   code points (== UTF-8 byte order; plain `String.compareTo` gets emoji vs U+FF5E wrong). Both are pinned by
   `unicode_*` oracle cases. Non-ASCII *identifiers* are invalid Jsonnet (jsonnetfmt rejects them too).
-- The JVM stack is not Go's: 10,000 nested arrays (`error.parse.deep_array_nesting.jsonnet`) overflow the recursive
-  passes, so `format()` turns `StackOverflowError` into a `ParseError` ("nested too deeply") instead of crashing the EDT.
+- The JVM stack is not Go's: the recursive passes overflow the caller's stack at a few hundred nested levels (~200 of `{a:`),
+  so `format()` retries once on a worker thread with a 512 MB stack (handles 200,000 levels) and only then turns
+  `StackOverflowError` into a `ParseError` ("nested too deeply") instead of crashing the EDT. Timings are in TODO.md item 20
+  (123 KB file: ~15 ms; no size guard needed). `JsonnetTextEdits` falls back to one edit if the platform diff gives up.
 - `Options.WHITESPACE_ONLY` (`rewriteTokens = false`, styles = leave, no import sorting) is for callers with
   `canChangeWhiteSpaceOnly`. The port's lexer drops digit separators (`1_000` -> `1000`), so `JsonnetFormattingService`
   verifies the result differs only in whitespace and otherwise does nothing (`Jsonnet.flex` lexes `1_000`, so such a file does

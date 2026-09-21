@@ -1,0 +1,55 @@
+name: jsonnetfmt differential
+
+# Opt-in: compares the Kotlin formatter port with the real jsonnetfmt on fresh corpora, every option variant.
+# Not part of ci.yml (it needs Go and network clones, and takes a few minutes). Run it from the Actions tab before a
+# release or after touching fmt/; the schedule catches upstream corpus changes.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  differential:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      # The tag comes from PortedFrom.kt, so the binary always is the release the port claims to match.
+      - name: Install the pinned jsonnetfmt
+        run: |
+          version=$(sed -n 's/.*GO_JSONNET_VERSION = "\(.*\)"/\1/p' src/main/kotlin/io/github/denis_zakharov/jsonnettanka/fmt/PortedFrom.kt)
+          go install "github.com/google/go-jsonnet/cmd/jsonnetfmt@${version}"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Checks that need no corpus
+        run: |
+          scripts/jsonnetfmt-conformance.py version
+          scripts/jsonnetfmt-conformance.py goldens
+
+      - name: Fetch corpora
+        run: scripts/jsonnetfmt-conformance.py fetch --dest "$RUNNER_TEMP/corpus"
+
+      - name: Differential run, all variants
+        run: scripts/jsonnetfmt-conformance.py differential --corpus "$RUNNER_TEMP/corpus" --variants all
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: build/reports/tests/

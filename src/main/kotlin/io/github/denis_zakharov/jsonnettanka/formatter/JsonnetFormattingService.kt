@@ -2,6 +2,8 @@ package io.github.denis_zakharov.jsonnettanka.formatter
 
 import com.intellij.diff.comparison.ComparisonManager
 import com.intellij.diff.comparison.ComparisonPolicy
+import com.intellij.diff.comparison.DiffTooBigException
+import com.intellij.diff.fragments.LineFragment
 import com.intellij.formatting.FormattingContext
 import com.intellij.formatting.service.AbstractDocumentFormattingService
 import com.intellij.formatting.service.FormattingService
@@ -74,11 +76,25 @@ class JsonnetFormattingService : AbstractDocumentFormattingService() {
 internal object JsonnetTextEdits {
     class Edit(val start: Int, val end: Int, val replacement: String)
 
-    /** Minimal edits (ascending, non-overlapping) turning [original] into [formatted]. */
-    fun compute(original: String, formatted: String): List<Edit> {
+    private fun compareLines(original: String, formatted: String): List<LineFragment> =
+        ComparisonManager.getInstance().compareLinesInner(original, formatted, ComparisonPolicy.DEFAULT, EmptyProgressIndicator())
+
+    /**
+     * Minimal edits (ascending, non-overlapping) turning [original] into [formatted]; if the platform's diff gives up
+     * ([DiffTooBigException], [diff] is a seam for testing that), the single edit covering everything but the common
+     * prefix and suffix.
+     */
+    fun compute(original: String, formatted: String, diff: (String, String) -> List<LineFragment> = ::compareLines): List<Edit> =
+        computeOrNull(original, formatted, diff) ?: listOf(replaceAll(original, formatted))
+
+    /** [compute], but null when the diff gave up, i.e. when the edits can't be told apart by range. */
+    private fun computeOrNull(original: String, formatted: String, diff: (String, String) -> List<LineFragment>): List<Edit>? {
         if (original == formatted) return emptyList()
-        val fragments = ComparisonManager.getInstance()
-            .compareLinesInner(original, formatted, ComparisonPolicy.DEFAULT, EmptyProgressIndicator())
+        val fragments = try {
+            diff(original, formatted)
+        } catch (_: DiffTooBigException) {
+            return null
+        }
         val edits = mutableListOf<Edit>()
         for (line in fragments) {
             val inner = line.innerFragments
@@ -100,10 +116,27 @@ internal object JsonnetTextEdits {
         return edits
     }
 
+    private fun replaceAll(original: String, formatted: String): Edit {
+        val max = minOf(original.length, formatted.length)
+        var prefix = 0
+        while (prefix < max && original[prefix] == formatted[prefix]) prefix++
+        var suffix = 0
+        while (suffix < max - prefix && original[original.length - 1 - suffix] == formatted[formatted.length - 1 - suffix]) suffix++
+        return Edit(prefix, original.length - suffix, formatted.substring(prefix, formatted.length - suffix))
+    }
+
     /** Applies the formatting to [document]; with [onlyWithin] set, just the edits that touch one of those ranges. */
-    fun apply(document: Document, formatted: String, onlyWithin: List<TextRange>?, project: Project? = null) {
+    fun apply(
+        document: Document,
+        formatted: String,
+        onlyWithin: List<TextRange>?,
+        project: Project? = null,
+        diff: (String, String) -> List<LineFragment> = ::compareLines,
+    ) {
         val original = document.text
-        val edits = compute(original, formatted).filter { e ->
+        // Without a diff a selection can't be honoured (one edit spans everything), so then it is left alone.
+        val all = computeOrNull(original, formatted, diff) ?: if (onlyWithin == null) listOf(replaceAll(original, formatted)) else return
+        val edits = all.filter { e ->
             onlyWithin == null || onlyWithin.any { r ->
                 if (e.start == e.end) r.startOffset <= e.start && e.start <= r.endOffset else e.start < r.endOffset && r.startOffset < e.end
             }

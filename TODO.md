@@ -351,27 +351,36 @@ sorting is part of the formatter), the reformat-on-save processor path, and the 
 the port rejects (`{a:1,a:2}`). Reformat-on-save itself (`ActionsOnSaveManager`) needs a real frame and is replayed via the
 processor `FormatOnSaveAction` builds; check the real thing in item 19.
 
-### 19. Manual pass in a real IDE
+### 19. ~~Manual pass in a real IDE~~ — DONE (checked by hand)
 `./gradlew runIde`: Ctrl+Alt+L on a real Tanka environment and on k8s-libsonnet files, compare with `tk fmt --stdout`; check
 undo restores the file in one step, caret/folds/bookmarks survive, the Code Style > Jsonnet page renders (tabs, preview, the
 "Rewrites" group under "Other"), `.editorconfig` `indent_size` is honoured, and that toggling each option changes the preview.
 
-### 20. Formatter performance and limits
-Reformat runs synchronously in a write action. Measure `JsonnetFormatter.format` and the diff step on the largest
-k8s-libsonnet file and the largest `vendor/` file; decide whether a size guard (or running the diff off the EDT) is needed.
-`compareLinesInner` has a `DiffTooBigException` path that `JsonnetTextEdits.compute` does not catch yet — fall back to
-replacing the whole text. Also decide whether nesting deeper than the default JVM stack (10,000 nested arrays) is worth a
-bigger-stack worker thread instead of the current "nested too deeply" refusal.
+### 20. ~~Formatter performance and limits~~ — DONE
+Measured (JIT-warm, `JsonnetFormatter.format` + `JsonnetTextEdits.compute`): the largest real files (k8s-libsonnet 1.34
+`cronJob.libsonnet`, 123 KB; also the largest `vendor/` file) format in 4–17 ms, the diff of a no-op takes <1 ms and of a fully
+unindented copy 10–60 ms. Synthetic files scale linearly: 4.8 MB (100k fields) 0.43 s format + 0.44 s diff, 20 MB 1.9 s + 2.3 s
+(2.8M edits), and `DiffTooBigException` never fired. **No size guard and no off-EDT step**: real Jsonnet is orders of magnitude
+below where this matters, and the synchronous path keeps undo/caret handling simple.
+- `JsonnetTextEdits` now catches `DiffTooBigException`: one edit around the common prefix/suffix for a whole-file request; a
+  selection is left alone (one edit can't be limited to a range).
+- Nesting: the limit was far lower than the "10,000 arrays" assumed — the caller's stack overflowed at ~200 levels of `{a:` and
+  a few hundred of `[`/`(`. `format()` now retries once on a worker thread with a 512 MB stack (only touched pages are committed;
+  the port has no IDE state, so waiting on it is safe) and formats 200,000 levels; beyond that it still refuses with "nested too
+  deeply". Tests in `JsonnetFormattingServiceTest` ("item 20").
 
-### 21. Keep the port honest over time
-- Write `scripts/jsonnetfmt-conformance.py` (modelled on `scripts/sjsonnet-conformance.py`): regenerate the oracle goldens and
-  run the differential test over given corpora after a go-jsonnet bump; record the ported version/commit in one place.
-- Wire an opt-in CI job (or a documented release checklist step) that runs `JsonnetFormatterDifferentialTest` with
-  `JSONNETFMT_VARIANTS=all` over a fresh k8s-libsonnet sparse clone (recipe in item 2) and go-jsonnet's `testdata`.
-- `Options.WHITESPACE_ONLY` has no oracle (jsonnetfmt has no such mode): add a property-style test that its output differs from
-  the input only in whitespace on the whole corpus.
-- Non-default `jsonnetfmt` flags beyond the seven covered variants (e.g. `--indent 8`, `--pad-arrays` with comprehensions) are
-  untested; widen `variants` if bugs show up.
+### 21. ~~Keep the port honest over time~~ — DONE
+- `scripts/jsonnetfmt-conformance.py` (`version`, `goldens [--write]`, `fetch`, `differential`); the ported release lives in
+  `fmt/PortedFrom.kt` and the script refuses a `jsonnetfmt` of another version. Checked end to end from fresh sparse clones
+  (k8s-libsonnet 1.34 + go-jsonnet `testdata` at the tag): 1,410 files x 10 variants, 0 mismatches.
+- `.github/workflows/jsonnetfmt-differential.yml`: manual + weekly, installs the pinned `jsonnetfmt`, fetches the corpora, runs
+  everything with `--variants all`. Also listed in the release checklist (`docs/publishing.md`).
+- `Options.WHITESPACE_ONLY`: `JsonnetFormatterWhitespaceOnlyTest` (property: same non-whitespace characters) over the checked-in
+  inputs and any `JSONNETFMT_CORPUS`. It found three lexer/unparser canonicalizations (digit separators, `a[1::]`, `|||-`) that
+  no option turns off — documented on the option, exempted in the test, and already refused by the service's guard.
+- Variants widened from 7 to 10 (`--indent 8 --pad-arrays`, `--indent 1 --max-blank-lines 3`, explicit `s`/`s` styles with
+  `--no-pad-objects --no-use-implicit-plus`): no new mismatches. The differential test no longer excludes
+  `error.parse.deep_array_nesting.jsonnet` (item 20's bigger stack makes the port format it like jsonnetfmt).
 
 ### 22. Adjacent typing niceties (not formatting proper)
 No `QuoteHandler` is registered (typing `'` or `"` doesn't auto-close), and `//` comment continuation on Enter is unverified.

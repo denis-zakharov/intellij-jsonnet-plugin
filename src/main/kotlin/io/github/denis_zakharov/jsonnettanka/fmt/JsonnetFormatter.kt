@@ -22,19 +22,38 @@ package io.github.denis_zakharov.jsonnettanka.fmt
  * fodder-preserving AST, runs a fixed pipeline of passes, and prints the result. Pure Kotlin, no IDE dependencies.
  */
 object JsonnetFormatter {
+    /** Stack for the retry in [format]; only the pages a deeply nested file actually touches are committed. */
+    private const val BIG_STACK_BYTES = 512L * 1024 * 1024
+
     /**
-     * Formats [input]; throws [ParseError] if it is not valid Jsonnet, or so deeply nested that the recursive
-     * passes would overflow the stack (go-jsonnet copes with e.g. 10,000 nested arrays thanks to Go's growable
-     * stacks; the JVM's fixed stack does not, and refusing is better than crashing the caller).
+     * Formats [input]; throws [ParseError] if it is not valid Jsonnet, or so deeply nested that even a very large stack
+     * would overflow. go-jsonnet copes with e.g. 10,000 nested arrays thanks to Go's growable stacks; the recursive
+     * passes here overflow the caller's stack at a few hundred levels, so that case is retried once on a worker thread
+     * with a [BIG_STACK_BYTES] stack (the port touches no IDE state, so the caller can simply wait for it).
      */
     @JvmStatic
     @JvmOverloads
     fun format(input: String, options: Options = Options.DEFAULT): String {
         try {
-            val parsed = parseJsonnet(input)
-            return formatNode(parsed.root, parsed.finalFodder, options)
-        } catch (e: StackOverflowError) {
-            throw ParseError("Expression is nested too deeply to format", 1, 1)
+            return formatUnchecked(input, options)
+        } catch (_: StackOverflowError) {
+            return formatOnBigStack(input, options)
+        }
+    }
+
+    private fun formatUnchecked(input: String, options: Options): String {
+        val parsed = parseJsonnet(input)
+        return formatNode(parsed.root, parsed.finalFodder, options)
+    }
+
+    private fun formatOnBigStack(input: String, options: Options): String {
+        var result: Result<String>? = null
+        val worker = Thread(null, { result = runCatching { formatUnchecked(input, options) } }, "jsonnetfmt", BIG_STACK_BYTES)
+        worker.start()
+        worker.join()
+        return result!!.getOrElse {
+            if (it is StackOverflowError) throw ParseError("Expression is nested too deeply to format", 1, 1)
+            throw it
         }
     }
 

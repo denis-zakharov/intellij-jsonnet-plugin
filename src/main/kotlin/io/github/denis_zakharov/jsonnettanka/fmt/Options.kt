@@ -57,8 +57,10 @@ data class Options(
 
         /**
          * Only whitespace changes (and comment reflow): no quote/comment-style rewrites, no import sorting, no
-         * field-name, `+`, comma or paren rewrites. One exception is inherent to the lexer: digit separators
-         * (`1_000`) are dropped, so callers that promise "whitespace only" should verify the result.
+         * field-name, `+`, comma or paren rewrites. Three exceptions are inherent to the lexer/unparser (go-jsonnet
+         * has them too): digit separators (`1_000`) are dropped, an empty slice step (`a[1::]`) loses its colon, and a
+         * `|||-` text block loses the `-` when its text ends the same way. Callers that promise "whitespace only"
+         * should verify the result.
          */
         val WHITESPACE_ONLY = Options(
             stringStyle = StringStyle.LEAVE,

@@ -33,6 +33,8 @@ publishes when a `vX.Y.Z` tag is pushed. This file is the one-time setup and the
 
 ## Releasing a version
 
+0. If `fmt/` changed since the last release, run the **jsonnetfmt differential** workflow (Actions tab; or locally
+   `scripts/jsonnetfmt-conformance.py differential --corpus … --variants all`) and check it is green.
 1. Bump `pluginVersion` in `gradle.properties`.
 2. Add a `## [X.Y.Z] - date` section to `CHANGELOG.md` (the workflow refuses to run without it) and
    update `<change-notes>` in `plugin.xml`, which is hand-written and not generated from the changelog.

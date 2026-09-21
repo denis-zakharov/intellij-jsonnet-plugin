@@ -12,6 +12,9 @@ import java.util.concurrent.TimeUnit
  *
  *     JSONNETFMT_BIN=~/go/bin/jsonnetfmt JSONNETFMT_CORPUS=/path/a:/path/b ./gradlew test --tests '*Differential*'
  *
+ * Rather than calling this directly, use `scripts/jsonnetfmt-conformance.py differential`, which also checks that the
+ * binary is the release the port is pinned to ([PortedFrom]).
+ *
  * `JSONNETFMT_BIN` defaults to `jsonnetfmt` on PATH; `JSONNETFMT_VARIANTS=all` also runs every option variant below
  * (default is the default options only). Files the binary rejects must be rejected by the port too. Corpora worth
  * running after any change to `fmt/`: a go-jsonnet checkout, a sparse k8s-libsonnet clone, and your own Tanka projects.
@@ -43,6 +46,13 @@ class JsonnetFormatterDifferentialTest {
             Options(useImplicitPlus = false, sortImports = false),
         ),
         Variant("no reindent, unlimited blank lines", listOf("-n", "0", "--max-blank-lines", "0"), Options(indent = 0, maxBlankLines = 0)),
+        Variant("indent 8, pad arrays and objects", listOf("-n", "8", "--pad-arrays"), Options(indent = 8, padArrays = true)),
+        Variant("indent 1, three blank lines", listOf("-n", "1", "--max-blank-lines", "3"), Options(indent = 1, maxBlankLines = 3)),
+        Variant(
+            "single quotes, slash comments, no pad objects, explicit plus",
+            listOf("--string-style", "s", "--comment-style", "s", "--no-pad-objects", "--no-use-implicit-plus"),
+            Options(stringStyle = StringStyle.SINGLE, commentStyle = CommentStyle.SLASH, padObjects = false, useImplicitPlus = false),
+        ),
     )
 
     private class Mismatch(val variant: String, val file: File, val detail: String)
@@ -83,8 +93,7 @@ class JsonnetFormatterDifferentialTest {
             }
             .sortedBy { it.path }
         assumeTrue(allFiles.isNotEmpty(), "no files under $corpus")
-        // jsonnetfmt formats 10,000 nested arrays; the JVM's stack can't, and the port refuses instead (see format()).
-        val files = allFiles.filter { it.name != "error.parse.deep_array_nesting.jsonnet" }
+        val files = allFiles
 
         val mismatches = Collections.synchronizedList(mutableListOf<Mismatch>())
         for (variant in active) {
