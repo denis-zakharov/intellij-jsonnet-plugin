@@ -49,6 +49,18 @@ object StdLibRegistry {
         return value.allKeyNames().toList().filterNot { it.startsWith("__") }.sorted()
     }
 
+    data class Parameter(val name: String, val optional: Boolean)
+
+    /**
+     * Parameter names of `std.<name>` as the pinned engine declares them (so they match what named arguments
+     * accept), or `null` for members that aren't functions (`pi`, `thisFile`).
+     */
+    fun parameters(name: String): List<Parameter>? {
+        val params = SjsonnetExtensions.functions[name]?.params() ?: return null
+        val defaults = params.defaultExprs()
+        return params.names().mapIndexed { i, paramName -> Parameter(paramName, defaults[i] != null) }
+    }
+
     /** True when [dotSuffix] is directly `std.<name>` — the same narrow "simple receiver" scope as field resolution. */
     fun isStdMemberAccess(dotSuffix: JsonnetDotSuffix): Boolean {
         val exprParent = dotSuffix.parent as? JsonnetExpr ?: return false

@@ -358,9 +358,11 @@ a tracked checklist.
   (400ms debounced) as the focused file or its ext-vars box changes. Stdlib
   completion/hover (`stdlib/`) reads `std`'s member names straight off
   `Val$Obj.visibleKeyNames()` at runtime, so it can't drift from the pinned
-  engine version by construction — hover text is deliberately minimal (name
-  only, no per-function description) rather than hand-maintained and
-  potentially wrong. Formatter shells out to `jsonnetfmt`/`tk fmt` via
+  engine version by construction. Hover shows the engine's own signature,
+  the official description (jsonnet.org, CC BY 2.5, bundled by
+  `scripts/update-stdlib-docs.py`), plus a usage snippet from `StdLibExamples`; every snippet's result is
+  evaluated by `StdLibExamplesTest`, so it can't be wrong. Functions the
+  reference doesn't describe get no prose rather than ours. Formatter shells out to `jsonnetfmt`/`tk fmt` via
   `AsyncDocumentFormattingService`, manually verified against a real
   `jsonnetfmt` binary on PATH (`echo '{a:1,b:2}' | jsonnetfmt -` →
   `{ a: 1, b: 2 }`), not yet through the actual Reformat Code action in a

@@ -372,6 +372,19 @@ NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
+## Jsonnet standard library reference (CC BY 2.5)
+
+The descriptions shown when hovering a `std` function (`src/main/resources/stdlib/jsonnet-stdlib-docs.txt`)
+are adapted from the [Jsonnet standard library reference](https://jsonnet.org/ref/stdlib.html) by the
+Jsonnet authors, which is licensed under the
+[Creative Commons Attribution 2.5 license](https://creativecommons.org/licenses/by/2.5/).
+
+Changes: the markup is simplified, each function's "Available since version" line is shown separately, and
+one-line "Example: ... yields ..." paragraphs are omitted, since the hover shows its own examples instead.
+The text is otherwise the authors'. The hover names the source and links to the function's entry in the
+reference. The generated file records the same terms, and `scripts/update-stdlib-docs.py` regenerates it.
+The usage examples, signatures and this plugin's code are not part of that work.
+
 ## This project
 
 The Jsonnet grammar in `src/main/grammar/Jsonnet.bnf` was written from the

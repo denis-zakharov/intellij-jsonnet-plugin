@@ -21,15 +21,28 @@ import com.dz.intellijjsonnet.shaded.sjsonnet.stdlib.StdLibModule
  */
 object SjsonnetExtensions {
 
-    /** The extended `std`; built once, it is immutable and safe to share between interpreters. */
-    val std: Val.Obj by lazy {
+    private val module: StdLibModule by lazy {
         val none = scalaMapOf<Val.Func>(emptyMap())
         // Stock built-ins: what the natives delegate to (`parseJson`)...
         val stock = StdLibModule(none, none).functions()
         val natives = TankaNatives.build(stock)
         // ...and what the parameter-renaming wrappers delegate to (incl. `std.native`, bound to our natives).
         val builtins = StdLibModule(natives, none).functions()
-        StdLibModule(natives, scalaMapOf(StdExtras.build(builtins))).module()
+        StdLibModule(natives, scalaMapOf(StdExtras.build(builtins)))
+    }
+
+    /** The extended `std`; built once, it is immutable and safe to share between interpreters. */
+    val std: Val.Obj by lazy { module.module() }
+
+    /** Every function of [std] by name, for reading arities and parameter names without evaluating anything. */
+    val functions: Map<String, Val.Func> by lazy {
+        val result = LinkedHashMap<String, Val.Func>()
+        val iterator = module.functions().iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            result[entry._1()] = entry._2()
+        }
+        result
     }
 
     @Suppress("UNCHECKED_CAST")
