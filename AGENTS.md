@@ -344,6 +344,49 @@ ecosystem at all — see the plan doc).
   probe file a unique name and read the test's failure XML rather than trusting a stale output file.
 - Markdown goes through the platform's `DocMarkdownToHtmlConverter` (fenced `jsonnet` blocks are highlighted).
 
+## Formatter (`fmt/` port + `formatter/` IDE wiring)
+
+- **Reformat Code == `jsonnetfmt`/`tk fmt` (verified: `tk fmt --stdout` output equals `jsonnetfmt`'s for default
+  options).** `fmt/` is a pure-Kotlin (no `com.intellij` imports) port of go-jsonnet **v0.22.0** (commit 567b61a)'s
+  lexer, parser, fodder AST, passes, `FixIndentation` and unparser; `JsonnetFormatter.format(text, Options)` is the
+  entry point. Our PSI is *flat* (no operator precedence), so the port has its own parser instead of reading PSI.
+  Apache-2.0 headers stay on every ported file (`THIRD_PARTY_NOTICES.md` explains).
+- **The oracle is the real binary.** `JsonnetFormatterDifferentialTest` (opt-in) runs the port and `jsonnetfmt` over a
+  corpus: `JSONNETFMT_BIN=~/go/bin/jsonnetfmt JSONNETFMT_VARIANTS=all JSONNETFMT_CORPUS=dirA:dirB ./gradlew cleanTest test
+  --tests '*Differential*' -i` (`cleanTest`: Gradle doesn't treat env vars as inputs, so a bare rerun is "up to date").
+  At the time of writing: 5,885 files (k8s-libsonnet 1.34, a Tanka project, grafana/tanka, go-jsonnet testdata, ...) x 7
+  option variants, 0 mismatches. Rerun after touching `fmt/` or bumping go-jsonnet. `JsonnetFormatterGoldenTest` is the
+  always-on version: upstream goldens (34 + 1 error golden) and four hand-written cases whose goldens are `jsonnetfmt`'s
+  own output (`src/test/resources/fmt/{upstream,oracle}`).
+- **Do not "fix" go-jsonnet's quirks; they are the spec.** Kept on purpose: `specs()` in `FixIndentation` visits
+  `spec.expr` (not `cond.expr`) for `if` conditions; the operator lexer collapses any operator ending in `+-~!$` to its
+  first char and any `/` ends an operator run; the slice parser tests `peek().data == ":"` regardless of token kind;
+  `FixTrailingCommas` skips empty arrays/objects without traversing them; `FixParens` removes one paren level per
+  run, so **jsonnetfmt is not idempotent on `(((1)))`** (don't assert idempotence beyond the upstream goldens).
+- **Columns are UTF-8 byte counts** (Go `len()`): `utf8Len` in `Ast.kt`, used by `FixIndentation`. Import sorting compares
+  code points (== UTF-8 byte order; plain `String.compareTo` gets emoji vs U+FF5E wrong). Both are pinned by
+  `unicode_*` oracle cases. Non-ASCII *identifiers* are invalid Jsonnet (jsonnetfmt rejects them too).
+- The JVM stack is not Go's: 10,000 nested arrays (`error.parse.deep_array_nesting.jsonnet`) overflow the recursive
+  passes, so `format()` turns `StackOverflowError` into a `ParseError` ("nested too deeply") instead of crashing the EDT.
+- `Options.WHITESPACE_ONLY` (`rewriteTokens = false`, styles = leave, no import sorting) is for callers with
+  `canChangeWhiteSpaceOnly`. The lexer still drops digit separators (`1_000` -> `1000`), so `JsonnetFormattingService`
+  verifies the result differs only in whitespace and otherwise does nothing. (Our own PSI lexer doesn't know `1_000` at
+  all, so such a file has PSI errors and never reaches the service; known gap, jsonnet >= 0.20 accepts them.)
+- **Wiring** (`formatter/`): `JsonnetFormattingService` (`AbstractDocumentFormattingService`, `order="first"`) declares only
+  `FORMAT_FRAGMENTS`, no `AD_HOC_FORMATTING`, so per `FormattingServiceUtil.findService` only explicit reformat reaches it and
+  paste/quick-fix formatting stays on the Block model (`JsonnetFormattingModelBuilder`), which is also what files with PSI errors
+  get (`canFormat` = no error elements). A selection formats the whole file and applies only the diff hunks inside it.
+  Edits are minimal (`compareLinesInner`, inner offsets are relative to the line fragment), and carets are re-mapped by hand
+  (`JsonnetTextEdits.mapOffset`) because an insertion exactly at the caret would otherwise leave it before the whitespace.
+  `JsonnetCodeStyleSettings` holds the jsonnetfmt toggles (ints for combo boxes); the default indent is 2 via `customizeDefaults`
+  (before this the platform's 4 applied to typing).
+- Testing gotcha: `getIndentOptionsByFile` is cached per document when the file is opened, so in a `BasePlatformTestCase`
+  set code style (`CodeStyle.runWithLocalSettings`) **before** `configureByText`, or an indent change is silently ignored.
+- **Not done yet (plan phase 4):** the Block model (`JsonnetBlock`) still has v1 indent rules and spacing; Enter / typed
+  `}` / paste indentation don't mirror `FixIndentation` (hanging alignment, `then`/`else`, binary continuation), `(`...`)`
+  isn't a structural brace pair, and there is no A-vs-B consistency harness. See `TODO.md` item 15; the original plan
+  (historical) is `formatter-plan.md`, section "B. Block model".
+
 ## Platform baseline
 
 - Built against IntelliJ IDEA Community **2025.1** (`platformVersion=2025.1`, `pluginSinceBuild=251`).

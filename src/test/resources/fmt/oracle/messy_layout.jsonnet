@@ -1,0 +1,19 @@
+local k = import "k.libsonnet", a = import 'a.libsonnet';
+local f(x,
+  y) = x+y;
+# hash comment
+{
+    "name": "x",   // trailing
+  'deploy'+: { replicas: 3, list: [1,2,
+      3], fn(a,b):: a+b },
+  cond: if a then
+      1 else 2,
+  s: |||
+     text
+       block
+  |||,
+    call: std.foo(1, 2,
+       3),
+  bin: 1 +
+     2 + 3,
+}

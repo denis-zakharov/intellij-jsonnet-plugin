@@ -26,7 +26,13 @@ First release. Requires IntelliJ Platform 2025.1 (build 251) or newer.
 - Unresolved-reference errors, cross-checked against sjsonnet's own scope analysis; an "unused local
   or hidden field" inspection with quick fixes (a hidden field is only reported when nothing in the
   project could read it, so library API used from other files is left alone; `vendor/` is skipped); parameter-name inlay hints.
-- Formatter, code folding, structure view, brace matching, commenter.
+- **Reformat Code produces exactly what `jsonnetfmt` / `tk fmt` produce**: the plugin embeds a Kotlin
+  port of go-jsonnet's formatter (checked byte for byte against the real `jsonnetfmt` on about 5,900
+  files, with every option combination). Selection reformat, format on save and "changed lines"
+  work too; the jsonnetfmt options (quote style, comment style, import sorting, padding, ...) are on
+  Settings | Editor | Code Style | Jsonnet, and the default indent is 2 like `jsonnetfmt`. Files with
+  syntax errors fall back to the indent-only formatter.
+- Code folding, structure view, brace matching, commenter.
 
 ### Evaluation
 - Embedded sjsonnet evaluator (shaded, no external process), extended to match go-jsonnet where it

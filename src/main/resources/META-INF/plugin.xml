@@ -127,6 +127,11 @@
             language="Jsonnet"
             implementationClass="io.github.denis_zakharov.jsonnettanka.formatter.JsonnetFormattingModelBuilder"/>
 
+        <!-- Reformat Code == jsonnetfmt/tk fmt; the Block-model formatter above serves typing, paste and broken files. -->
+        <formattingService implementation="io.github.denis_zakharov.jsonnettanka.formatter.JsonnetFormattingService" order="first"/>
+        <codeStyleSettingsProvider implementation="io.github.denis_zakharov.jsonnettanka.formatter.JsonnetCodeStyleSettingsProvider"/>
+        <langCodeStyleSettingsProvider implementation="io.github.denis_zakharov.jsonnettanka.formatter.JsonnetLanguageCodeStyleSettingsProvider"/>
+
         <json.jsonSchemaProviderFactory implementation="io.github.denis_zakharov.jsonnettanka.tanka.schema.TankaJsonSchemaProviderFactory"/>
 
         <codeInsight.unresolvedReferenceQuickFixProvider implementation="io.github.denis_zakharov.jsonnettanka.tanka.JbInstallQuickFixProvider"/>

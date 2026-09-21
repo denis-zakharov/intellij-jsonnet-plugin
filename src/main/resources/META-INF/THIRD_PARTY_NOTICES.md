@@ -7,9 +7,17 @@ renames packages; the code is otherwise unmodified. Licenses below are as declar
 artifact's published POM for the versions this build resolves, and the license texts and copyright
 notices are reproduced in full further down, as those licenses require.
 
+Separately, the plugin's formatter (`io.github.denis_zakharov.jsonnettanka.fmt`) is a **Kotlin port of
+[go-jsonnet](https://github.com/google/go-jsonnet)'s `jsonnetfmt`** (v0.22.0, commit 567b61a): lexer, parser,
+AST, formatting passes and unparser. It is derived work under go-jsonnet's Apache License 2.0; every ported
+file keeps go-jsonnet's license header and says what it was ported from and that it was modified. No go-jsonnet
+binary or source is shipped. The formatter's test resources (`src/test/resources/fmt/upstream`) are go-jsonnet's
+and jsonnet's own formatter goldens, under the same license.
+
 | Component | Version | License |
 |---|---|---|
 | com.databricks:sjsonnet | 0.7.4 | Apache License 2.0 |
+| github.com/google/go-jsonnet (formatter, ported) | 0.22.0 | Apache License 2.0 |
 | org.scala-lang:scala3-library, scala-library | 3.3.8 / 2.13.18 | Apache-2.0 |
 | org.scala-lang.modules:scala-collection-compat | 2.14.0 | Apache-2.0 |
 | com.lihaoyi:fastparse | 3.1.1 | MIT |
@@ -29,6 +37,7 @@ notices are reproduced in full further down, as those licenses require.
 Used under the terms of the license reproduced below. Copyright notices:
 
 - **sjsonnet** — Copyright 2018 Databricks Inc
+- **go-jsonnet** (ported formatter) — Copyright 2019 Google Inc. All rights reserved.
 - **scala3-library, scala-library, scala-collection-compat** — the upstream `NOTICE` reads:
 
 ```text

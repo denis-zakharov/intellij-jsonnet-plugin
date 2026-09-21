@@ -60,7 +60,7 @@ class JsonnetPlatformIntegrationTest : BasePlatformTestCase() {
         myFixture.checkResult("{ total: 1, next: self.total + 1 }")
     }
 
-    // --- Formatter (real CodeStyleManager.reformat() invocation) ---
+    // --- Formatter (real CodeStyleManager.reformat() invocation; see JsonnetFormattingServiceTest for the rest) ---
 
     fun `test reformat fixes indentation and enforces baseline spacing`() {
         myFixture.configureByText(
@@ -75,13 +75,14 @@ class JsonnetPlatformIntegrationTest : BasePlatformTestCase() {
         WriteCommandAction.runWriteCommandAction(project) {
             CodeStyleManager.getInstance(project).reformat(myFixture.file)
         }
+        // jsonnetfmt output: two-space indent and a final newline.
         myFixture.checkResult(
             "{\n" +
-                "    a: 1,\n" +
-                "    b: {\n" +
-                "        c: 2,\n" +
-                "    },\n" +
-                "}",
+                "  a: 1,\n" +
+                "  b: {\n" +
+                "    c: 2,\n" +
+                "  },\n" +
+                "}\n",
         )
     }
 

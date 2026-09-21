@@ -1,0 +1,43 @@
+// hash comment é
+local x = 1000 + 20.50e10;
+/* block ☃
+   comment */
+{
+  s: @'verb''atim é',
+  t: @"v""x",
+  u: |||
+    text é
+      block 😀
+  |||,
+  'a-b': 1,
+  c: 2,
+  d: 3,
+  ['e' + 'f']: 4,
+  h:: 1,
+  i::: 2,
+  j+: {},
+  k+:: {},
+  m: self.x.y.z,
+  n: super.a,
+  o: super['b'],
+  p: 'x' in super,
+  q: [x for x in [1, 2] if x > 1],
+  r: { [k]: 1 for k in ['a'] },
+  s2: a[1:2:3],
+  s3: a[::2],
+  s4: a[1:],
+  s5: a[:],
+  t2: function(a, b=1) a,
+  u2: assert true : 'msg'; 1,
+  v: error 'x',
+  w: !true,
+  w2: -1,
+  w3: ~1,
+  w4: +1,
+  x2: ((1)),
+  y: a { b: 1 } { c: 2 },
+  z: a { b: 1 } + { c: 2 },
+  local l = 1,
+  local m(x) = x,
+  assert self.a == 1 : 'ok',
+}

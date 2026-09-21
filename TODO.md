@@ -309,6 +309,75 @@ Not built. What it would take is in the "not planned" entry below.
 
 ---
 
+### 14. ~~Byte-exact `jsonnetfmt` formatting for Reformat Code~~ — DONE (typing side: item 15)
+Kotlin port of go-jsonnet v0.22.0's formatter in `fmt/` behind `JsonnetFormattingService`; code-style page with the
+jsonnetfmt toggles; default indent 2. Checked against the real `jsonnetfmt` over 5,885 files x 7 option variants with 0
+mismatches, plus upstream and hand-written goldens. Details, quirks kept on purpose and the test recipe: AGENTS.md
+"Formatter". Follow-ups: items 15-22.
+
+### 15. Block-model (typing) indentation that agrees with `jsonnetfmt` (plan phase 4, not started)
+Enter, typed `}`/`]`/`)`, paste and files with syntax errors still use the v1 `JsonnetBlock` rules (fixed nesting, no
+hanging alignment, no `then`/`else`/binary-operator/`local` continuation rules). Full plan: "B. Block model" in
+`formatter-plan.md`. Sub-items, in priority order:
+- Rewrite the indent rules after `FixIndentation` (`Indent` + `Alignment`; align to the first element's column when it
+  shares the opener's line, else `base + indent`) and make `getChildAttributes` right for *incomplete* constructs
+  (`{ a: 1,⏎`, `f(a,⏎`, `local x =⏎`, `if c then⏎`, `a +⏎`).
+- Consistency harness: for every jsonnetfmt-canonical file (goldens + corpus output) strip one line's indent, ask
+  `CodeStyleManager.adjustLineIndent` for it back, compare; track the match rate over non-comment lines and only leave
+  documented deviations. Write it first and expect it to fail for real reasons.
+- Make `(`...`)` a structural pair in `JsonnetBraceMatcher` so a typed `)` re-indents like `}`/`]`; check single-line calls.
+- Rebase `jsonnetSpacingBuilder` on the unparser's spacing (`{ a }`, `[a]`, `f(x)`, `a.b`, unary ops, `:`/`::`/`+:`, keep
+  line breaks); the current `before(LBRACK)`/`before(LPAREN)` rules have never been exercised.
+- Enter inside a `|||` text block (one multi-line token, so the Block model isn't consulted): check the caret's indent, add an
+  `EnterHandlerDelegate` if it isn't the previous line's. Also check Enter on `//`/`#` lines and between `{|}`.
+
+### 16. PSI lexer/grammar: digit separators (`1_000`)
+jsonnet >= 0.20 / go-jsonnet accept `1_000`, `1_0.5_0e1_0`; our `Jsonnet.flex` lexes `1` then an identifier, so such files get
+error elements (no highlighting sanity, unresolved-reference noise) and never reach `JsonnetFormattingService` (they fall back
+to the Block formatter). Fix the lexer, add a `JsonnetLexerTest` case, and then add a platform test that a whitespace-only
+reformat of `{a:1_000}` is refused (today only the guard, `JsonnetTextEdits.sameApartFromWhitespace`, is unit-tested).
+Check sjsonnet's own support before promising evaluation.
+
+### 17. Reformat must not touch `vendor/` (and dotfiles) by default
+`tk fmt` excludes `**/.*`, `.*`, `**/vendor/**`, `vendor/**`. The IDE formats whatever the user asks, including
+reformat-on-save and "Reformat directory" inside a Tanka `vendor/`. Decide: skip vendor files in
+`JsonnetFormattingService.formatDocument` (and how to do it without falling through to the Block model, which would
+still format them), or leave explicit reformat alone and skip only implicit paths. Reuse the vendor test from
+`JsonnetStubIndexUtil` / `TankaJpath`.
+
+### 18. Verify the formatting entry points that only the Reformat Code action covers today
+`JsonnetFormattingServiceTest` exercises `CodeStyleManager.reformat`, `reformatText` (selection) and the Reformat Code action.
+Not tested yet: Actions on Save > Reformat code (`FormatOnSaveAction`), Reformat File dialog options ("only changed text" via
+VCS ranges -> `formatRanges` with several ranges), reformat of a directory, optimize-imports-with-reformat, and the
+"Can't format" balloon shown when the port rejects a PSI-valid file (e.g. duplicate field or local, which go-jsonnet's parser
+rejects but our PSI accepts). Add tests for each and fix what they turn up.
+
+### 19. Manual pass in a real IDE
+`./gradlew runIde`: Ctrl+Alt+L on a real Tanka environment and on k8s-libsonnet files, compare with `tk fmt --stdout`; check
+undo restores the file in one step, caret/folds/bookmarks survive, the Code Style > Jsonnet page renders (tabs, preview, the
+"Rewrites" group under "Other"), `.editorconfig` `indent_size` is honoured, and that toggling each option changes the preview.
+
+### 20. Formatter performance and limits
+Reformat runs synchronously in a write action. Measure `JsonnetFormatter.format` and the diff step on the largest
+k8s-libsonnet file and the largest `vendor/` file; decide whether a size guard (or running the diff off the EDT) is needed.
+`compareLinesInner` has a `DiffTooBigException` path that `JsonnetTextEdits.compute` does not catch yet — fall back to
+replacing the whole text. Also decide whether nesting deeper than the default JVM stack (10,000 nested arrays) is worth a
+bigger-stack worker thread instead of the current "nested too deeply" refusal.
+
+### 21. Keep the port honest over time
+- Write `scripts/jsonnetfmt-conformance.py` (modelled on `scripts/sjsonnet-conformance.py`): regenerate the oracle goldens and
+  run the differential test over given corpora after a go-jsonnet bump; record the ported version/commit in one place.
+- Wire an opt-in CI job (or a documented release checklist step) that runs `JsonnetFormatterDifferentialTest` with
+  `JSONNETFMT_VARIANTS=all` over a fresh k8s-libsonnet sparse clone (recipe in item 2) and go-jsonnet's `testdata`.
+- `Options.WHITESPACE_ONLY` has no oracle (jsonnetfmt has no such mode): add a property-style test that its output differs from
+  the input only in whitespace on the whole corpus.
+- Non-default `jsonnetfmt` flags beyond the seven covered variants (e.g. `--indent 8`, `--pad-arrays` with comprehensions) are
+  untested; widen `variants` if bugs show up.
+
+### 22. Adjacent typing niceties (not formatting proper)
+No `QuoteHandler` is registered (typing `'` or `"` doesn't auto-close), and `//` comment continuation on Enter is unverified.
+Small, separately testable; do them together with item 15 if the typing tests are being written anyway.
+
 ## Explicitly not planned (revisit only if the premise changes)
 
 - **Online completion for `jsonnetfile.json` package names/versions** —

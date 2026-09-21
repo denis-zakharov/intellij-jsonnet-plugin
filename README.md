@@ -19,7 +19,7 @@ newer. It depends only on the platform and the bundled JSON module — see [Comp
 - Errors for unresolved references (cross-checked against sjsonnet's own scope analysis), an inspection
   for unused locals and hidden fields with quick fixes, a warning for `std` functions that only the preview
   engine has (they'd fail under `tk`), parameter-name inlay hints.
-- Formatter, folding, structure view, brace matching, commenting.
+- Formatter (Reformat Code is byte-identical to `jsonnetfmt` / `tk fmt`), folding, structure view, brace matching, commenting.
 
 **Evaluation** (all in-process)
 - **Jsonnet Preview** tool window — live output for the focused file, as JSON or YAML (toolbar toggle).
