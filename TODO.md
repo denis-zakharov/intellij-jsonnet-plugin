@@ -189,7 +189,12 @@ re-run with `scripts/sjsonnet-conformance.py` after any sjsonnet/go-jsonnet bump
   appended after the extras merge), `helmTemplate`/`kustomizeBuild` (external
   binaries; `std.native` is `null` for them in the preview).
 
-### 11. Number-to-string fidelity with go-jsonnet/Tanka
+### 11. ~~Number-to-string fidelity with go-jsonnet/Tanka~~ — CLOSED (won't fix)
+**Decision:** the divergence exists only in the plugin's own evaluation (Preview, Evaluate actions); exports go through the real
+`tk`, which never touches sjsonnet. Fixing it needs a patched sjsonnet, which isn't worth maintaining for a preview. Still
+documented in `README.md` and `docs/sjsonnet-gaps.md`. Revisit if sjsonnet upstream fixes it or a misleading preview is reported.
+
+Original analysis:
 `std.toString(0.1)` and `"" + 0.1` are `"0.10000000000000001"` in go-jsonnet
 *and Tanka* (17 significant digits), `"0.1"` in sjsonnet — a real divergence for
 anything Jsonnet stringifies (ConfigMap data, labels built by concatenation).
