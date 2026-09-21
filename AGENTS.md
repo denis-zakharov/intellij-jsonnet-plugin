@@ -303,7 +303,10 @@ ecosystem at all — see the plan doc).
   excluding GoLand. It was a Phase 0 leftover.
 - `THIRD_PARTY_NOTICES.md` lists licenses copied from the resolved artifacts' POMs;
   regenerate it (`./gradlew :shaded-sjsonnet:dependencies --configuration shaded`,
-  then read each POM's `<license>`) whenever the sjsonnet version changes.
+  then read each POM's `<license>`) whenever the sjsonnet version changes. It also
+  reproduces each license's full text and copyright line (MIT/BSD/Apache require
+  that in a binary distribution), so re-check those against upstream too — a POM
+  license can change between versions (xz went from Public Domain to 0BSD in 1.11).
 
 ## Startup warnings (checked via the test sandbox log)
 

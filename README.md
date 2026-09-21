@@ -78,8 +78,7 @@ constraints; `TODO.md` is the backlog.
 
 ## Licenses
 
+This project's own code is released under the [MIT License](LICENSE), with no warranty of any kind.
+
 The plugin bundles sjsonnet and its dependencies (Apache-2.0, MIT and others) — see
 [`THIRD_PARTY_NOTICES.md`](src/main/resources/META-INF/THIRD_PARTY_NOTICES.md).
-
-The license for this project's own code has not been chosen yet; add a `LICENSE` file and update this
-section before publishing.

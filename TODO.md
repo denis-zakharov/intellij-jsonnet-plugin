@@ -234,7 +234,14 @@ written against the code, including an explicit *Limitations* section.
   most Tanka users are, presumably). Removed along with the matching
   `bundledPlugin("com.intellij.java")`; all tests still pass.
 - **Still open before actually publishing — none of these are mine to decide:**
-  1. **A `LICENSE` for this project's own code.** None exists; README says so.
+  1. ~~**A `LICENSE` for this project's own code.**~~ **Done: MIT.** `LICENSE`
+     added, README updated, and `THIRD_PARTY_NOTICES.md` now reproduces every
+     bundled component's license text and copyright line (not just names and
+     links, which MIT/BSD/Apache don't accept for a binary distribution). Also
+     corrected xz: 1.11 is 0BSD, not Public Domain. Two upstream gaps recorded
+     there: scalatags ships no license file (POM says MIT), and lz4-java's
+     native libs embed LZ4/xxHash (BSD-2). Optionally add the license URL on the
+     Marketplace listing at publish time.
   2. **Screenshots** (Preview, Imports, color page) — needs a running IDE.
   3. **`./gradlew verifyPlugin` across the recommended IDEs** (GoLand, IU, …).
      Dropping the Java dependency makes them plausible targets but they have
