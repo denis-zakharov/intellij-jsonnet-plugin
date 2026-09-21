@@ -310,6 +310,29 @@ ecosystem at all — see the plan doc).
   provider got a `getCustomDocumentationElement` — calling `generateDoc` directly would have passed.
   The snippet is lexer-highlighted, so its HTML has spans and spaces as `&#32;`; strip both in assertions.
 
+## Docsonnet hover (`docsonnet/`)
+
+- **What it reads.** `'#name':: d.fn(help, args)` / `d.obj` / `d.val` next to `name` (`DocsonnetReader`, PSI only —
+  no evaluation, no `doc-util` needed, works on unsaved edits and costs nothing across k8s-libsonnet's ~10k
+  annotations). Positional *and* named arguments (`d.fn(help=…, args=[d.arg(name=…, type=…)])` is what
+  k8s-libsonnet's generator emits), `'#x':` as well as `'#x'::` (xtd), text blocks, `+`-joined strings. The
+  receiver of `d.fn` isn't checked — docsonnet claims `#` keys. Not read: a computed `help` (variable,
+  `std.format`), `d.pkg` (`'#'`), and doc-util's own alias form `'#arg':: self.argument['#new'] + …`.
+- **Test against the real annotations, not invented ones.** The forms above were found by grepping the vendored
+  libraries of a real Tanka project, and two only showed up there: k8s help strings are *JSON-quoted*
+  (`'"Annotations is…"\n\n**Note:** …'`, escapes still inside — `unquoteGeneratedHelp`, only when the closing quote
+  ends the text or a line), and `_custom/` files document overrides as a *modifier*,
+  `'#new'+: d.func.withArgs([…])`, meaning "the generated help, these args".
+- **Composed definitions.** `k.apps.v1.deployment.new` resolves to several fields (`gen + _custom`), and the
+  platform shows nothing for an ambiguous reference. `getCustomDocumentationElement` hands over the last
+  documented target (its parameter list is the effective signature) and `generateDoc` folds the docstrings of
+  all definitions up to it in composition order (`effectiveDoc`: a call replaces, a modifier edits).
+- **Probing a real project** (worth repeating after touching this): copy its `.jsonnet`/`.libsonnet` files into a
+  `BasePlatformTestCase` fixture *including `jsonnetfile.json`* — `TankaJpath.findRoot` needs it, and without it
+  `import 'k.libsonnet'` silently resolves to nothing, i.e. "no hover" that looks like a docsonnet bug. Give each
+  probe file a unique name and read the test's failure XML rather than trusting a stale output file.
+- Markdown goes through the platform's `DocMarkdownToHtmlConverter` (fenced `jsonnet` blocks are highlighted).
+
 ## Platform baseline
 
 - Built against IntelliJ IDEA Community **2025.1** (`platformVersion=2025.1`, `pluginSinceBuild=251`).

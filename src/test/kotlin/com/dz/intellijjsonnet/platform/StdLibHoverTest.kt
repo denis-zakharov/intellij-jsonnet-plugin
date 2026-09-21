@@ -1,8 +1,5 @@
 package com.dz.intellijjsonnet.platform
 
-import com.intellij.lang.documentation.ide.IdeDocumentationTargetProvider
-import com.intellij.openapi.util.text.StringUtil
-import com.intellij.platform.backend.documentation.impl.computeDocumentationBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 /**
@@ -12,15 +9,9 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
  */
 class StdLibHoverTest : BasePlatformTestCase() {
 
-    /** The hover as plain text: the snippet is syntax-highlighted, so its HTML is full of spans. */
     private fun hoverAt(text: String): String? {
         myFixture.configureByText("a.jsonnet", text)
-        val targets = IdeDocumentationTargetProvider.getInstance(project)
-            .documentationTargets(myFixture.editor, myFixture.file, myFixture.caretOffset)
-        val html = targets.firstNotNullOfOrNull { computeDocumentationBlocking(it.createPointer())?.html } ?: return null
-        // The highlighter emits spaces as `&#32;`; `unescapeXmlEntities` only knows the named ones.
-        val withoutTags = html.replace(Regex("<[^>]+>"), "")
-        return StringUtil.unescapeXmlEntities(withoutTags.replace(Regex("&#(\\d+);")) { it.groupValues[1].toInt().toChar().toString() })
+        return hoverAtCaret(myFixture)
     }
 
     fun `test hover on a std call shows its signature and a usage snippet with the result`() {
