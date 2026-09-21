@@ -4,7 +4,7 @@ Native (non-LSP) IntelliJ support for [Jsonnet](https://jsonnet.org) and [Tanka]
 a real PSI grammar plus the [sjsonnet](https://github.com/databricks/sjsonnet) evaluator embedded
 in-process. There is no language-server process to install, start or keep in sync.
 
-Plugin id `com.dz.intellij-jsonnet-tanka`. Requires an IntelliJ Platform IDE, build 251 (2025.1) or
+Plugin id `io.github.denis-zakharov.jsonnet-tanka`. Requires an IntelliJ Platform IDE, build 251 (2025.1) or
 newer. It depends only on the platform and the bundled JSON module — see [Compatibility](#compatibility).
 
 ## Features
@@ -72,7 +72,7 @@ Use the checked-in Gradle wrapper. Gradle itself runs on JDK 21 (pinned in
 ## How it's put together
 
 Two modules: the plugin, and `:shaded-sjsonnet`, which repackages sjsonnet and its Scala 3 runtime under
-`com.dz.intellijjsonnet.shaded.*` so it can't collide with JetBrains' bundled Scala plugin. `AGENTS.md` and
+`io.github.denis_zakharov.jsonnettanka.shaded.*` so it can't collide with JetBrains' bundled Scala plugin. `AGENTS.md` and
 `jsonnet-tanka-intellij-plugin-plan.md` record the design, the bugs found along the way and the testing
 constraints; `TODO.md` is the backlog.
 

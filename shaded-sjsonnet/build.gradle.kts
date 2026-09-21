@@ -36,21 +36,21 @@ tasks {
     shadowJar {
         archiveClassifier.set("")
         configurations = listOf(shaded)
-        relocate("scala", "com.dz.intellijjsonnet.shaded.scala")
-        relocate("sjsonnet", "com.dz.intellijjsonnet.shaded.sjsonnet")
-        relocate("fastparse", "com.dz.intellijjsonnet.shaded.fastparse")
-        relocate("ujson", "com.dz.intellijjsonnet.shaded.ujson")
-        relocate("upickle", "com.dz.intellijjsonnet.shaded.upickle")
-        relocate("geny", "com.dz.intellijjsonnet.shaded.geny")
+        relocate("scala", "io.github.denis_zakharov.jsonnettanka.shaded.scala")
+        relocate("sjsonnet", "io.github.denis_zakharov.jsonnettanka.shaded.sjsonnet")
+        relocate("fastparse", "io.github.denis_zakharov.jsonnettanka.shaded.fastparse")
+        relocate("ujson", "io.github.denis_zakharov.jsonnettanka.shaded.ujson")
+        relocate("upickle", "io.github.denis_zakharov.jsonnettanka.shaded.upickle")
+        relocate("geny", "io.github.denis_zakharov.jsonnettanka.shaded.geny")
         // NOTE: deliberately NOT relocating the bare "os" package (os-lib) — Shadow's
         // relocator rewrites matching string literals too, and "os" as a prefix
         // collides with unrelated "os.arch"/"os.name" System.getProperty() keys used
         // by transitive deps (e.g. lz4-java), corrupting them into garbage properties.
-        relocate("pprint", "com.dz.intellijjsonnet.shaded.pprint")
-        relocate("mainargs", "com.dz.intellijjsonnet.shaded.mainargs")
-        relocate("scalatags", "com.dz.intellijjsonnet.shaded.scalatags")
+        relocate("pprint", "io.github.denis_zakharov.jsonnettanka.shaded.pprint")
+        relocate("mainargs", "io.github.denis_zakharov.jsonnettanka.shaded.mainargs")
+        relocate("scalatags", "io.github.denis_zakharov.jsonnettanka.shaded.scalatags")
         // IntelliJ's own platform bundles snakeyaml; relocate to avoid classpath skew.
-        relocate("org.yaml.snakeyaml", "com.dz.intellijjsonnet.shaded.org.yaml.snakeyaml")
+        relocate("org.yaml.snakeyaml", "io.github.denis_zakharov.jsonnettanka.shaded.org.yaml.snakeyaml")
         mergeServiceFiles()
     }
 }

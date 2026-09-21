@@ -1,7 +1,7 @@
 <idea-plugin>
-    <id>com.dz.intellij-jsonnet-tanka</id>
+    <id>io.github.denis-zakharov.jsonnet-tanka</id>
     <name>Jsonnet + Tanka</name>
-    <vendor email="dizaharov@gmail.com">dz</vendor>
+    <vendor email="dizaharov@gmail.com">denis-zakharov</vendor>
 
     <description><![CDATA[
         <p>
@@ -46,108 +46,108 @@
     <extensions defaultExtensionNs="com.intellij">
         <fileType
             name="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.lang.JsonnetFileType"
+            implementationClass="io.github.denis_zakharov.jsonnettanka.lang.JsonnetFileType"
             fieldName="INSTANCE"
             language="Jsonnet"
             extensions="jsonnet"/>
         <fileType
             name="Libsonnet"
-            implementationClass="com.dz.intellijjsonnet.lang.LibsonnetFileType"
+            implementationClass="io.github.denis_zakharov.jsonnettanka.lang.LibsonnetFileType"
             fieldName="INSTANCE"
             language="Jsonnet"
             extensions="libsonnet"/>
 
         <lang.parserDefinition
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.lang.JsonnetParserDefinition"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.lang.JsonnetParserDefinition"/>
 
         <lang.syntaxHighlighterFactory
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.editor.JsonnetSyntaxHighlighterFactory"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetSyntaxHighlighterFactory"/>
 
         <lang.braceMatcher
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.editor.JsonnetBraceMatcher"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetBraceMatcher"/>
 
         <lang.commenter
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.editor.JsonnetCommenter"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetCommenter"/>
 
         <lang.foldingBuilder
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.editor.JsonnetFoldingBuilder"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetFoldingBuilder"/>
 
         <lang.elementManipulator
-            forClass="com.dz.intellijjsonnet.lang.psi.JsonnetImportExpr"
-            implementationClass="com.dz.intellijjsonnet.lang.psi.JsonnetImportExprManipulator"/>
+            forClass="io.github.denis_zakharov.jsonnettanka.lang.psi.JsonnetImportExpr"
+            implementationClass="io.github.denis_zakharov.jsonnettanka.lang.psi.JsonnetImportExprManipulator"/>
 
         <lang.psiStructureViewFactory
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.editor.structure.JsonnetStructureViewFactory"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.structure.JsonnetStructureViewFactory"/>
 
-        <stubElementTypeHolder class="com.dz.intellijjsonnet.lang.psi.JsonnetTypes"/>
+        <stubElementTypeHolder class="io.github.denis_zakharov.jsonnettanka.lang.psi.JsonnetTypes"/>
 
-        <stubIndex implementation="com.dz.intellijjsonnet.lang.stubs.JsonnetBindIndex"/>
+        <stubIndex implementation="io.github.denis_zakharov.jsonnettanka.lang.stubs.JsonnetBindIndex"/>
 
-        <stubIndex implementation="com.dz.intellijjsonnet.lang.stubs.JsonnetFieldIndex"/>
+        <stubIndex implementation="io.github.denis_zakharov.jsonnettanka.lang.stubs.JsonnetFieldIndex"/>
 
-        <gotoSymbolContributor implementation="com.dz.intellijjsonnet.lang.stubs.JsonnetGotoSymbolContributor"/>
-
-        <completion.contributor
-            language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.editor.JsonnetKeywordCompletionContributor"/>
+        <gotoSymbolContributor implementation="io.github.denis_zakharov.jsonnettanka.lang.stubs.JsonnetGotoSymbolContributor"/>
 
         <completion.contributor
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.stdlib.StdLibCompletionContributor"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetKeywordCompletionContributor"/>
 
         <completion.contributor
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.tanka.TankaNativeFunctionCompletionContributor"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.stdlib.StdLibCompletionContributor"/>
 
         <completion.contributor
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.tanka.TankaTkModuleCompletionContributor"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.tanka.TankaNativeFunctionCompletionContributor"/>
 
-        <typedHandler implementation="com.dz.intellijjsonnet.editor.JsonnetDotAutoPopupHandler"/>
+        <completion.contributor
+            language="Jsonnet"
+            implementationClass="io.github.denis_zakharov.jsonnettanka.tanka.TankaTkModuleCompletionContributor"/>
+
+        <typedHandler implementation="io.github.denis_zakharov.jsonnettanka.editor.JsonnetDotAutoPopupHandler"/>
 
         <lang.findUsagesProvider
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.editor.JsonnetFindUsagesProvider"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetFindUsagesProvider"/>
 
         <lang.documentationProvider
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.stdlib.StdLibDocumentationProvider"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.stdlib.StdLibDocumentationProvider"/>
 
         <lang.documentationProvider
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.docsonnet.DocsonnetDocumentationProvider"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.docsonnet.DocsonnetDocumentationProvider"/>
 
         <lang.formatter
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.formatter.JsonnetFormattingModelBuilder"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.formatter.JsonnetFormattingModelBuilder"/>
 
-        <json.jsonSchemaProviderFactory implementation="com.dz.intellijjsonnet.tanka.schema.TankaJsonSchemaProviderFactory"/>
+        <json.jsonSchemaProviderFactory implementation="io.github.denis_zakharov.jsonnettanka.tanka.schema.TankaJsonSchemaProviderFactory"/>
 
-        <codeInsight.unresolvedReferenceQuickFixProvider implementation="com.dz.intellijjsonnet.tanka.JbInstallQuickFixProvider"/>
+        <codeInsight.unresolvedReferenceQuickFixProvider implementation="io.github.denis_zakharov.jsonnettanka.tanka.JbInstallQuickFixProvider"/>
 
         <notificationGroup id="Jsonnet" displayType="BALLOON"/>
 
-        <iconProvider implementation="com.dz.intellijjsonnet.tanka.TankaFileIconProvider"/>
+        <iconProvider implementation="io.github.denis_zakharov.jsonnettanka.tanka.TankaFileIconProvider"/>
 
         <annotator
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.editor.JsonnetUnresolvedReferenceAnnotator"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetUnresolvedReferenceAnnotator"/>
 
         <annotator
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.editor.JsonnetSemanticHighlightingAnnotator"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetSemanticHighlightingAnnotator"/>
 
-        <colorSettingsPage implementation="com.dz.intellijjsonnet.editor.JsonnetColorSettingsPage"/>
+        <colorSettingsPage implementation="io.github.denis_zakharov.jsonnettanka.editor.JsonnetColorSettingsPage"/>
 
         <codeInsight.parameterNameHints
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.editor.JsonnetInlayParameterHintsProvider"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetInlayParameterHintsProvider"/>
 
         <localInspection language="Jsonnet"
                          shortName="JsonnetUnusedDeclaration"
@@ -155,28 +155,28 @@
                          groupName="Jsonnet"
                          enabledByDefault="true"
                          level="WARNING"
-                         implementationClass="com.dz.intellijjsonnet.inspection.JsonnetUnusedDeclarationInspection"/>
+                         implementationClass="io.github.denis_zakharov.jsonnettanka.inspection.JsonnetUnusedDeclarationInspection"/>
 
         <toolWindow id="Jsonnet Preview"
                     anchor="right"
                     icon="/icons/jsonnet.svg"
-                    factoryClass="com.dz.intellijjsonnet.editor.preview.JsonnetPreviewToolWindowFactory"/>
+                    factoryClass="io.github.denis_zakharov.jsonnettanka.editor.preview.JsonnetPreviewToolWindowFactory"/>
 
         <toolWindow id="Jsonnet Imports"
                     anchor="right"
                     icon="/icons/jsonnet.svg"
-                    factoryClass="com.dz.intellijjsonnet.imports.JsonnetImportGraphToolWindowFactory"/>
+                    factoryClass="io.github.denis_zakharov.jsonnettanka.imports.JsonnetImportGraphToolWindowFactory"/>
 
-        <configurationType implementation="com.dz.intellijjsonnet.editor.runconfig.JsonnetRunConfigurationType"/>
+        <configurationType implementation="io.github.denis_zakharov.jsonnettanka.editor.runconfig.JsonnetRunConfigurationType"/>
 
         <runLineMarkerContributor
             language="Jsonnet"
-            implementationClass="com.dz.intellijjsonnet.editor.runconfig.TankaEnvironmentRunLineMarkerProvider"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.runconfig.TankaEnvironmentRunLineMarkerProvider"/>
     </extensions>
 
     <actions>
         <action id="Jsonnet.EvaluateFile"
-                class="com.dz.intellijjsonnet.editor.EvaluateJsonnetFileAction"
+                class="io.github.denis_zakharov.jsonnettanka.editor.EvaluateJsonnetFileAction"
                 text="Open Jsonnet Preview"
                 description="Open the Jsonnet Preview tool window, evaluated with the embedded sjsonnet interpreter">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
@@ -184,7 +184,7 @@
         </action>
 
         <action id="Jsonnet.ShowImportGraph"
-                class="com.dz.intellijjsonnet.imports.ShowJsonnetImportGraphAction"
+                class="io.github.denis_zakharov.jsonnettanka.imports.ShowJsonnetImportGraphAction"
                 text="Show Jsonnet Import Graph"
                 description="Open the Jsonnet Imports tool window: what this file imports, or what imports it">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
@@ -192,12 +192,12 @@
         </action>
 
         <action id="Jsonnet.NewTankaEnvironment"
-                class="com.dz.intellijjsonnet.tanka.NewTankaEnvironmentAction">
+                class="io.github.denis_zakharov.jsonnettanka.tanka.NewTankaEnvironmentAction">
             <add-to-group group-id="NewGroup" anchor="last"/>
         </action>
 
         <action id="Jsonnet.CompareTankaEnvironments"
-                class="com.dz.intellijjsonnet.tanka.CompareTankaEnvironmentsAction"
+                class="io.github.denis_zakharov.jsonnettanka.tanka.CompareTankaEnvironmentsAction"
                 text="Compare Tanka Environment With..."
                 description="Run 'tk show' for this environment and another one, and open the result in a diff view">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
@@ -205,7 +205,7 @@
         </action>
 
         <action id="Jsonnet.EvaluateExpression"
-                class="com.dz.intellijjsonnet.editor.EvaluateJsonnetExpressionAction"
+                class="io.github.denis_zakharov.jsonnettanka.editor.EvaluateJsonnetExpressionAction"
                 text="Evaluate Jsonnet Expression"
                 description="Evaluate the selected expression (plus this file's top-level locals) with the embedded sjsonnet interpreter">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>

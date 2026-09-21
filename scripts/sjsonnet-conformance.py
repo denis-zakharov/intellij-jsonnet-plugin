@@ -23,7 +23,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MAIN = "com.dz.intellijjsonnet.shaded.sjsonnet.SjsonnetMain"
+MAIN = "io.github.denis_zakharov.jsonnettanka.shaded.sjsonnet.SjsonnetMain"
 
 # go's own test-suite feeds these to the extvar_* cases (main_test.go)
 EXT_STR = {"stringVar": "2 + 2"}

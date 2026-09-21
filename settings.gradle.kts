@@ -13,7 +13,7 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-rootProject.name = "intellij-jsonnet-tanka"
+rootProject.name = "jsonnet-tanka"
 
 include(":shaded-sjsonnet")
 

@@ -661,7 +661,7 @@ a tracked checklist.
 ## 9. Suggested repo shape for Claude Code to scaffold
 
 ```
-intellij-jsonnet-tanka/
+jsonnet-tanka/
   build.gradle.kts                 # IntelliJ Platform Gradle plugin, Grammar-Kit, Shadow
   gradle.properties
   src/main/kotlin/

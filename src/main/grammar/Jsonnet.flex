@@ -1,8 +1,8 @@
-package com.dz.intellijjsonnet.lang.lexer;
+package io.github.denis_zakharov.jsonnettanka.lang.lexer;
 
 import com.intellij.lexer.FlexLexer;
 import com.intellij.psi.tree.IElementType;
-import static com.dz.intellijjsonnet.lang.psi.JsonnetTypes.*;
+import static io.github.denis_zakharov.jsonnettanka.lang.psi.JsonnetTypes.*;
 import static com.intellij.psi.TokenType.BAD_CHARACTER;
 import static com.intellij.psi.TokenType.WHITE_SPACE;
 

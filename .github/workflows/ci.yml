@@ -20,7 +20,7 @@ jobs:
         run: ./gradlew clean buildPlugin test --console=plain
 
       - name: Std lib registry sanity check
-        run: ./gradlew test --tests "com.dz.intellijjsonnet.stdlib.StdLibRegistrySanityTest" --console=plain
+        run: ./gradlew test --tests "io.github.denis_zakharov.jsonnettanka.stdlib.StdLibRegistrySanityTest" --console=plain
 
       - name: Upload plugin artifact
         if: always()

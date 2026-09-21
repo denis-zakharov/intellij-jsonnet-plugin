@@ -50,7 +50,7 @@ dependencies {
 
 intellijPlatform {
     pluginConfiguration {
-        id.set("com.dz.intellij-jsonnet-tanka")
+        id.set("io.github.denis-zakharov.jsonnet-tanka")
         name.set("Jsonnet + Tanka")
         version.set(providers.gradleProperty("pluginVersion"))
 
@@ -79,15 +79,15 @@ sourceSets {
 tasks.named<GenerateLexerTask>("generateLexer") {
     sourceFile.set(file("src/main/grammar/Jsonnet.flex"))
     targetRootOutputDir.set(generatedSourcesDir)
-    pathToClass.set("com/dz/intellijjsonnet/lang/lexer/JsonnetLexer.java")
+    pathToClass.set("io/github/denis_zakharov/jsonnettanka/lang/lexer/JsonnetLexer.java")
     purgeOldFiles.set(true)
 }
 
 tasks.named<GenerateParserTask>("generateParser") {
     sourceFile.set(file("src/main/grammar/Jsonnet.bnf"))
     targetRootOutputDir.set(generatedSourcesDir)
-    pathToParser.set("com/dz/intellijjsonnet/lang/parser/JsonnetParser.java")
-    pathToPsiRoot.set("com/dz/intellijjsonnet/lang/psi")
+    pathToParser.set("io/github/denis_zakharov/jsonnettanka/lang/parser/JsonnetParser.java")
+    pathToPsiRoot.set("io/github/denis_zakharov/jsonnettanka/lang/psi")
     purgeOldFiles.set(true)
 }
 

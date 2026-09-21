@@ -13,7 +13,7 @@ specific to *this* sandbox environment.
 A native (non-LSP) IntelliJ plugin for Jsonnet + Tanka: a Grammar-Kit PSI
 grammar plus the embedded `sjsonnet` (Databricks, Scala 3, Apache-2.0)
 evaluator running in-process — no external language server. Package
-`com.dz.intellijjsonnet`, plugin id `com.dz.intellij-jsonnet-tanka`.
+`io.github.denis_zakharov.jsonnettanka`, plugin id `io.github.denis-zakharov.jsonnet-tanka`.
 
 Phases 0–5 are implemented (4 and 5 partially — see the plan doc's Phase 4/5
 status blocks for exactly what's deferred: `BasePlatformTestCase`-based
@@ -49,7 +49,7 @@ ecosystem at all — see the plan doc).
   resurfaces (e.g. after a Kotlin/Gradle plugin upgrade removes the need for
   the pin, or a new JDK major version needs the same treatment).
 - Two modules: root plugin + `:shaded-sjsonnet` (shades `sjsonnet` + its Scala
-  3 runtime into `com.dz.intellijjsonnet.shaded.*` so it can't collide with
+  3 runtime into `io.github.denis_zakharov.jsonnettanka.shaded.*` so it can't collide with
   JetBrains' own bundled Scala plugin). The shaded dependency lives in a
   dedicated `shaded` configuration, NOT `implementation` — otherwise its raw
   transitive jars (scala-library, snakeyaml, ...) leak into the plugin's
@@ -119,7 +119,7 @@ ecosystem at all — see the plan doc).
   path, not just bytecode class references. Relocating the bare `os` package
   (for os-lib) turned the string literal `"os.arch"` inside `lz4-java`'s
   `System.getProperty("os.arch")` call into
-  `"com.dz.intellijjsonnet.shaded.os.arch"`, silently returning `null` and
+  `"io.github.denis_zakharov.jsonnettanka.shaded.os.arch"`, silently returning `null` and
   causing an `NPE` deep in a static initializer. Fix: only relocate package
   prefixes actually at risk of colliding with IntelliJ's own bundled classes
   (`scala`, `sjsonnet`, `fastparse`, `ujson`, `upickle`, `geny`, `pprint`,

@@ -1,17 +1,17 @@
 {
-  parserClass="com.dz.intellijjsonnet.lang.parser.JsonnetParser"
+  parserClass="io.github.denis_zakharov.jsonnettanka.lang.parser.JsonnetParser"
 
   extends="com.intellij.extapi.psi.ASTWrapperPsiElement"
 
   psiClassPrefix="Jsonnet"
   psiImplClassSuffix="Impl"
-  psiPackage="com.dz.intellijjsonnet.lang.psi"
-  psiImplPackage="com.dz.intellijjsonnet.lang.psi.impl"
+  psiPackage="io.github.denis_zakharov.jsonnettanka.lang.psi"
+  psiImplPackage="io.github.denis_zakharov.jsonnettanka.lang.psi.impl"
 
-  elementTypeHolderClass="com.dz.intellijjsonnet.lang.psi.JsonnetTypes"
-  elementTypeClass="com.dz.intellijjsonnet.lang.psi.JsonnetElementType"
-  elementTypeFactory="com.dz.intellijjsonnet.lang.stubs.JsonnetStubElementTypeFactory.factory"
-  tokenTypeClass="com.dz.intellijjsonnet.lang.psi.JsonnetTokenType"
+  elementTypeHolderClass="io.github.denis_zakharov.jsonnettanka.lang.psi.JsonnetTypes"
+  elementTypeClass="io.github.denis_zakharov.jsonnettanka.lang.psi.JsonnetElementType"
+  elementTypeFactory="io.github.denis_zakharov.jsonnettanka.lang.stubs.JsonnetStubElementTypeFactory.factory"
+  tokenTypeClass="io.github.denis_zakharov.jsonnettanka.lang.psi.JsonnetTokenType"
 
   tokens=[
     LOCAL_KW='local'
@@ -111,7 +111,7 @@ private postfixSuffix ::= dotSuffix | indexSuffix | callSuffix | objectLiteral
 
 dotSuffix ::= DOT IDENTIFIER {
   pin=1
-  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetDotSuffixMixin"
+  mixin="io.github.denis_zakharov.jsonnettanka.lang.psi.impl.JsonnetDotSuffixMixin"
 }
 
 // Not `expr | sliceParts`: for "1:3" the `expr` alternative alone would
@@ -141,7 +141,7 @@ private atom ::= NUMBER | STRING | TRUE_KW | FALSE_KW | NULL_KW | SELF_KW | SUPE
                 | nameRef
 
 nameRef ::= IDENTIFIER {
-  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetNameRefMixin"
+  mixin="io.github.denis_zakharov.jsonnettanka.lang.psi.impl.JsonnetNameRefMixin"
 }
 
 parenExpr ::= LPAREN expr RPAREN {
@@ -159,8 +159,8 @@ localExpr ::= LOCAL_KW bind (COMMA bind)* SEMI expr {
 // actually get indexed (top-level only; vendor/ excluded).
 bind ::= IDENTIFIER paramList? ASSIGN expr {
   pin=1
-  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetBindMixin"
-  stubClass="com.dz.intellijjsonnet.lang.stubs.JsonnetBindStub"
+  mixin="io.github.denis_zakharov.jsonnettanka.lang.psi.impl.JsonnetBindMixin"
+  stubClass="io.github.denis_zakharov.jsonnettanka.lang.stubs.JsonnetBindStub"
 }
 
 paramList ::= LPAREN (param (COMMA param)* COMMA?)? RPAREN {
@@ -169,7 +169,7 @@ paramList ::= LPAREN (param (COMMA param)* COMMA?)? RPAREN {
 
 param ::= IDENTIFIER (ASSIGN expr)? {
   pin=1
-  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetParamMixin"
+  mixin="io.github.denis_zakharov.jsonnettanka.lang.psi.impl.JsonnetParamMixin"
 }
 
 ifExpr ::= IF_KW expr THEN_KW expr (ELSE_KW expr)? {
@@ -183,7 +183,7 @@ functionExpr ::= FUNCTION_KW paramList expr {
 // The mixin hosts the path's file references: a bare STRING token can't (see JsonnetImportReferences).
 importExpr ::= (IMPORT_KW | IMPORTSTR_KW | IMPORTBIN_KW) STRING {
   pin=1
-  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetImportExprMixin"
+  mixin="io.github.denis_zakharov.jsonnettanka.lang.psi.impl.JsonnetImportExprMixin"
 }
 
 assertExpr ::= ASSERT_KW expr (COLON expr)? SEMI expr {
@@ -213,8 +213,8 @@ objectAssert ::= ASSERT_KW expr (COLON expr)? {
 // Stub-backed (see the `bind` rule above for why).
 field ::= fieldName paramList? fieldOp expr {
   pin=3
-  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetFieldMixin"
-  stubClass="com.dz.intellijjsonnet.lang.stubs.JsonnetFieldStub"
+  mixin="io.github.denis_zakharov.jsonnettanka.lang.psi.impl.JsonnetFieldMixin"
+  stubClass="io.github.denis_zakharov.jsonnettanka.lang.stubs.JsonnetFieldStub"
 }
 
 private fieldName ::= IDENTIFIER | STRING | computedFieldName
@@ -246,7 +246,7 @@ arrayComprehension ::= expr forSpec compSpec* {
 
 forSpec ::= FOR_KW IDENTIFIER IN_KW expr {
   pin=1
-  mixin="com.dz.intellijjsonnet.lang.psi.impl.JsonnetForSpecMixin"
+  mixin="io.github.denis_zakharov.jsonnettanka.lang.psi.impl.JsonnetForSpecMixin"
 }
 
 private compSpec ::= forSpec | ifSpec

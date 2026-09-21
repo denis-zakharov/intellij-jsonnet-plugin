@@ -2,7 +2,7 @@
 
 The plugin's fast tier evaluates with sjsonnet 0.7.4; Tanka (and so the ground truth) runs go-jsonnet.
 This records where they differ, measured rather than assumed, and which differences the in-project
-extension (`src/main/kotlin/com/dz/intellijjsonnet/engine/extension/`) closes.
+extension (`src/main/kotlin/io/github/denis_zakharov/jsonnettanka/engine/extension/`) closes.
 
 Measured against go-jsonnet v0.22.0 (`testdata/`, 590 runnable cases) and Tanka v0.39. Re-run with
 `scripts/sjsonnet-conformance.py` after bumping either.
