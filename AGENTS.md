@@ -25,7 +25,7 @@ ecosystem at all — see the plan doc).
 ## Build system
 
 - **Use `./gradlew`**, not a system `gradle` — the wrapper is checked in
-  (`gradle/wrapper/`, Gradle 9.3.0). No hardcoded JDK *path* anywhere; both
+  (`gradle/wrapper/`, Gradle 9.8.0). No hardcoded JDK *path* anywhere; both
   `build.gradle.kts` and `shaded-sjsonnet/build.gradle.kts` declare a
   `java { toolchain { languageVersion = 21 } }` / `kotlin { jvmToolchain(21) }`
   block, so compilation always targets JDK 21 regardless of which JDK
@@ -42,7 +42,7 @@ ecosystem at all — see the plan doc).
   versions fail against this Gradle version's `JvmVendorSpec` API). This is a
   toolchain *version number*, not a path, so it stays portable — but it does
   mean the daemon no longer just inherits whatever JVM is on `PATH`. This
-  exists because the Kotlin Gradle Plugin at the time (2.0.21, pre-dates JDK 25; now 2.3.x) forks
+  exists because the Kotlin Gradle Plugin at the time (2.0.21, pre-dates JDK 25; now 2.4.x) forks
   its Compile Daemon from the Gradle daemon's own JVM, and its vendored
   `JavaVersion` parser throws on any JDK-25-family version string — see
   AGENTS.md's Testing section for the full symptom/diagnosis if this
@@ -424,7 +424,7 @@ ecosystem at all — see the plan doc).
 - Built against IntelliJ IDEA Community **2025.1** (`platformVersion=2025.1`, `pluginSinceBuild=251`).
   From 2025.1 the JSON plugin's classes (`com.jetbrains.jsonSchema`) are no longer on the plain
   platform classpath: `build.gradle.kts` declares `bundledPlugin("com.intellij.modules.json")`
-  (that *is* the plugin's id). Newer platforms bundle a newer Kotlin stdlib/metadata than KGP 2.0.21 (now 2.3.21)
+  (that *is* the plugin's id). Newer platforms bundle a newer Kotlin stdlib/metadata than KGP 2.0.21 (now 2.4.20)
   can read (it tolerates one minor ahead, i.e. 2.1) — expect to bump Kotlin when moving to 2025.2+.
 
 ## Import graph / marketplace notes (ADRs 0006, 0007)

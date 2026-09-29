@@ -22,7 +22,7 @@ java {
 
 val sjsonnetVersion = "0.7.4"
 
-val shaded: Configuration by configurations.creating
+val shaded: Configuration = configurations.create("shaded")
 
 dependencies {
     shaded("com.databricks:sjsonnet_3:$sjsonnetVersion")
