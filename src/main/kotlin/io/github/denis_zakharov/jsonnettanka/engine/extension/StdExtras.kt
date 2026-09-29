@@ -8,7 +8,7 @@ import io.github.denis_zakharov.jsonnettanka.shaded.sjsonnet.`TailstrictModeDisa
 import io.github.denis_zakharov.jsonnettanka.shaded.sjsonnet.Val
 
 /**
- * `std` functions go-jsonnet has and `sjsonnet` 0.7.4 lacks, or has under different *parameter names*
+ * `std` functions go-jsonnet has and `sjsonnet` 0.7.5 lacks, or has under different *parameter names*
  * (which breaks named-argument calls such as `std.hypot(x=3, y=4)`). Found by running go-jsonnet's
  * `testdata/` and a per-parameter probe against both; see `docs/sjsonnet-gaps.md`.
  */
