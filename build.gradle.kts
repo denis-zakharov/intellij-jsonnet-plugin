@@ -106,6 +106,11 @@ tasks.named<GenerateParserTask>("generateParser") {
     pathToParser.set("io/github/denis_zakharov/jsonnettanka/lang/parser/JsonnetParser.java")
     pathToPsiRoot.set("io/github/denis_zakharov/jsonnettanka/lang/psi")
     purgeOldFiles.set(true)
+    // The headless Grammar-Kit JVM has no loaded Registry, so PSI reads of these keys log
+    // "Attempt to load key ... for not yet loaded registry". A system property of the same
+    // name is consulted first and skips the warning; values are the platform defaults.
+    systemProperty("psi.sleep.in.validity.check", "false")
+    systemProperty("psi.incremental.reparse.depth.limit", "1000")
 }
 
 tasks.withType<KotlinCompile> {
