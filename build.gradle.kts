@@ -125,6 +125,9 @@ tasks {
     withType<KotlinCompile> {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+            // Without this Kotlin copies every default method of a platform Kotlin interface into the implementing
+            // class, which the Plugin Verifier reports as overriding @ApiStatus.Internal API (ToolWindowFactory).
+            jvmDefault.set(org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode.NO_COMPATIBILITY)
         }
     }
     withType<JavaCompile> {
