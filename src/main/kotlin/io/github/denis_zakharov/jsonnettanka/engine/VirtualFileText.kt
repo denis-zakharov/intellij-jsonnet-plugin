@@ -1,6 +1,6 @@
 package io.github.denis_zakharov.jsonnettanka.engine
 
-import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
@@ -14,7 +14,7 @@ import com.intellij.openapi.vfs.VirtualFile
  */
 object VirtualFileText {
 
-    fun read(file: VirtualFile): String = ReadAction.compute<String, RuntimeException> {
+    fun read(file: VirtualFile): String = ApplicationManager.getApplication().runReadAction<String> {
         FileDocumentManager.getInstance().getCachedDocument(file)?.text ?: VfsUtilCore.loadText(file)
     }
 }

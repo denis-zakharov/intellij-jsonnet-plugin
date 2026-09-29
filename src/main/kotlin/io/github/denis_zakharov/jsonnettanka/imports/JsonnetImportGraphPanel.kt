@@ -12,6 +12,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
@@ -130,7 +131,7 @@ class JsonnetImportGraphPanel(private val project: Project) : JPanel(BorderLayou
     /** Synchronous variant for tests. */
     internal fun refreshNow() {
         val file = currentFile ?: return
-        show(ReadAction.compute<ImportNode, RuntimeException> { build(file, showImporters, expandVendor) }, showImporters)
+        show(ApplicationManager.getApplication().runReadAction<ImportNode> { build(file, showImporters, expandVendor) }, showImporters)
     }
 
     private fun build(file: VirtualFile, importers: Boolean, vendor: Boolean): ImportNode {

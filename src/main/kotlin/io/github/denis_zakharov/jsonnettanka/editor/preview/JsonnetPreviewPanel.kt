@@ -120,7 +120,7 @@ class JsonnetPreviewPanel(private val project: Project) : JPanel(BorderLayout())
         for (field in listOf(extVarsField, tlaVarsField)) {
             field.document.addDocumentListener(object : DocumentListener {
                 override fun documentChanged(event: DocumentEvent) = scheduleRefresh()
-            })
+            }, this)
         }
 
         watchJsonnetDocuments()
