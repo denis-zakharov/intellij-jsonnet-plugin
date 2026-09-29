@@ -20,7 +20,7 @@ java {
     }
 }
 
-val sjsonnetVersion = "0.7.4"
+val sjsonnetVersion = "0.7.5"
 
 val shaded: Configuration = configurations.create("shaded")
 

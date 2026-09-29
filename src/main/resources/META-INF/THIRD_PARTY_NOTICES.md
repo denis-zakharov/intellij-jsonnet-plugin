@@ -16,7 +16,7 @@ and jsonnet's own formatter goldens, under the same license.
 
 | Component | Version | License |
 |---|---|---|
-| com.databricks:sjsonnet | 0.7.4 | Apache License 2.0 |
+| com.databricks:sjsonnet | 0.7.5 | Apache License 2.0 |
 | github.com/google/go-jsonnet (formatter, ported) | 0.22.0 | Apache License 2.0 |
 | org.scala-lang:scala3-library, scala-library | 3.3.8 / 2.13.18 | Apache-2.0 |
 | org.scala-lang.modules:scala-collection-compat | 2.14.0 | Apache-2.0 |

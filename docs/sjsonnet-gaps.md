@@ -1,6 +1,6 @@
 # sjsonnet vs go-jsonnet: what's missing, and what the plugin does about it
 
-The plugin's fast tier evaluates with sjsonnet 0.7.4; Tanka (and so the ground truth) runs go-jsonnet.
+The plugin's fast tier evaluates with sjsonnet 0.7.5; Tanka (and so the ground truth) runs go-jsonnet.
 This records where they differ, measured rather than assumed, and which differences the in-project
 extension (`src/main/kotlin/io/github/denis_zakharov/jsonnettanka/engine/extension/`) closes.
 
