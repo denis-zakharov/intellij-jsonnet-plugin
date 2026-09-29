@@ -161,9 +161,15 @@
 
         <colorSettingsPage implementation="io.github.denis_zakharov.jsonnettanka.editor.JsonnetColorSettingsPage"/>
 
-        <codeInsight.parameterNameHints
+        <codeInsight.declarativeInlayProvider
             language="Jsonnet"
-            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetInlayParameterHintsProvider"/>
+            implementationClass="io.github.denis_zakharov.jsonnettanka.editor.JsonnetInlayParameterHintsProvider"
+            isEnabledByDefault="true"
+            group="PARAMETERS_GROUP"
+            providerId="jsonnet.parameter.names"
+            bundle="messages.JsonnetBundle"
+            nameKey="inlay.parameter.names.name"
+            descriptionKey="inlay.parameter.names.description"/>
 
         <localInspection language="Jsonnet"
                          shortName="JsonnetUnusedDeclaration"

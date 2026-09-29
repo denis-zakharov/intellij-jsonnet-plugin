@@ -11,9 +11,16 @@ import io.github.denis_zakharov.jsonnettanka.lang.psi.JsonnetParamList
 import io.github.denis_zakharov.jsonnettanka.lang.psi.nameIdentifier
 import io.github.denis_zakharov.jsonnettanka.lang.psi.reference.JsonnetFieldReference
 import io.github.denis_zakharov.jsonnettanka.lang.psi.reference.JsonnetLocalReference
-import com.intellij.codeInsight.hints.InlayInfo
-import com.intellij.codeInsight.hints.InlayParameterHintsProvider
+import com.intellij.codeInsight.hints.declarative.HintColorKind
+import com.intellij.codeInsight.hints.declarative.HintFormat
+import com.intellij.codeInsight.hints.declarative.InlayHintsCollector
+import com.intellij.codeInsight.hints.declarative.InlayHintsProvider
+import com.intellij.codeInsight.hints.declarative.InlayTreeSink
+import com.intellij.codeInsight.hints.declarative.InlineInlayPosition
+import com.intellij.codeInsight.hints.declarative.SharedBypassCollector
+import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
 import com.intellij.psi.TokenType
 
 /**
@@ -31,15 +38,29 @@ import com.intellij.psi.TokenType
  * already has a precise answer for "what does this evaluate to" — the
  * Preview tool window.
  */
-class JsonnetInlayParameterHintsProvider : InlayParameterHintsProvider {
+class JsonnetInlayParameterHintsProvider : InlayHintsProvider {
 
-    override fun getParameterHints(element: PsiElement): List<InlayInfo> {
+    /** A `name:` hint to show at [offset]. */
+    data class ParameterHint(val text: String, val offset: Int)
+
+    override fun createCollector(file: PsiFile, editor: Editor): InlayHintsCollector = object : SharedBypassCollector {
+        override fun collectFromElement(element: PsiElement, sink: InlayTreeSink) {
+            for (hint in parameterHints(element)) {
+                sink.addPresentation(
+                    InlineInlayPosition(hint.offset, relatedToPrevious = false),
+                    hintFormat = HintFormat.default.withColorKind(HintColorKind.Parameter),
+                ) { text(hint.text) }
+            }
+        }
+    }
+
+    fun parameterHints(element: PsiElement): List<ParameterHint> {
         val callSuffix = element as? JsonnetCallSuffix ?: return emptyList()
         val argList = callSuffix.argList ?: return emptyList()
         val paramNames = paramNamesFor(callSuffix) ?: return emptyList()
         if (paramNames.isEmpty()) return emptyList()
 
-        val hints = mutableListOf<InlayInfo>()
+        val hints = mutableListOf<ParameterHint>()
         var position = 0
         for (child in argList.node.getChildren(null)) {
             val arg = child.psi
@@ -50,14 +71,12 @@ class JsonnetInlayParameterHintsProvider : InlayParameterHintsProvider {
             if (arg !is JsonnetExpr) continue
             val paramName = paramNames.getOrNull(position)
             if (paramName != null && arg.text != paramName) {
-                hints += InlayInfo("$paramName:", arg.textRange.startOffset)
+                hints += ParameterHint("$paramName:", arg.textRange.startOffset)
             }
             position++
         }
         return hints
     }
-
-    override fun getDefaultBlackList(): Set<String> = emptySet()
 
     /** The names of the resolved callee's declared params, in order — `null` if the callee can't be resolved. */
     private fun paramNamesFor(callSuffix: JsonnetCallSuffix): List<String>? {

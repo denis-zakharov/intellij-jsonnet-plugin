@@ -7,10 +7,10 @@ import io.github.denis_zakharov.jsonnettanka.lang.psi.nameIdentifier
 import io.github.denis_zakharov.jsonnettanka.tanka.TankaNativeFunctions
 import com.intellij.lang.documentation.AbstractDocumentationProvider
 import com.intellij.lang.documentation.DocumentationMarkup
-import com.intellij.lang.documentation.DocumentationSettings
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.richcopy.HtmlSyntaxInfoUtil
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.StringUtil.escapeXmlEntities
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -63,7 +63,7 @@ class StdLibDocumentationProvider : AbstractDocumentationProvider() {
                 val snippet = if (example.result == null) example.code else "${example.code}\n// => ${example.result}"
                 append("<pre>")
                 HtmlSyntaxInfoUtil.appendHighlightedByLexerAndEncodedAsHtmlCodeSnippet(
-                    this, project, JsonnetLanguage, snippet, true, DocumentationSettings.getHighlightingSaturation(false),
+                    this, project, JsonnetLanguage, snippet, true, highlightingSaturation(),
                 )
                 append("</pre>")
                 example.note?.let { append("<i>").append(markdownCode(escapeXmlEntities(it))).append("</i>") }
@@ -88,3 +88,10 @@ class StdLibDocumentationProvider : AbstractDocumentationProvider() {
 
     private fun markdownCode(escaped: String): String = escaped.replace(Regex("`([^`]+)`"), "<code>$1</code>")
 }
+
+/**
+ * What `DocumentationSettings.getHighlightingSaturation(false)` computes; that class is @ApiStatus.Experimental, the
+ * registry key behind it is not. 1.0 is the normal saturation.
+ */
+private fun highlightingSaturation(): Float =
+    Registry.intValue("documentation.component.highlighting.saturation.for.hints", 100).coerceIn(0, 100) * 0.01f

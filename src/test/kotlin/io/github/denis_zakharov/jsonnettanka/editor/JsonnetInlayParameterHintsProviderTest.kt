@@ -20,35 +20,35 @@ class JsonnetInlayParameterHintsProviderTest : ParsingTestCase("", "jsonnet", Js
 
     fun `test positional args get param name hints for a local function`() {
         val call = callSuffixes("local add(x, y) = x + y; add(1, 2)").last()
-        val hints = provider.getParameterHints(call)
+        val hints = provider.parameterHints(call)
         assertEquals(listOf("x:", "y:"), hints.map { it.text })
     }
 
     fun `test named arg is skipped but still consumes its position`() {
         val call = callSuffixes("local add(x, y) = x + y; add(1, y=2)").last()
-        val hints = provider.getParameterHints(call)
+        val hints = provider.parameterHints(call)
         assertEquals(listOf("x:"), hints.map { it.text })
     }
 
     fun `test hint suppressed when the argument text already matches the param name`() {
         val call = callSuffixes("local add(x, y) = x + y; local x = 1; add(x, 2)").last()
-        val hints = provider.getParameterHints(call)
+        val hints = provider.parameterHints(call)
         assertEquals(listOf("y:"), hints.map { it.text })
     }
 
     fun `test method-style call through self resolves params too`() {
         val call = callSuffixes("{ greet(name):: 'hi ' + name, x: self.greet('a') }").last()
-        val hints = provider.getParameterHints(call)
+        val hints = provider.parameterHints(call)
         assertEquals(listOf("name:"), hints.map { it.text })
     }
 
     fun `test unresolved callee yields no hints`() {
         val call = callSuffixes("unknownFn(1, 2)").single()
-        assertTrue(provider.getParameterHints(call).isEmpty())
+        assertTrue(provider.parameterHints(call).isEmpty())
     }
 
     fun `test call to a value with no params yields no hints`() {
         val call = callSuffixes("local f = 1; f(1)").last()
-        assertTrue(provider.getParameterHints(call).isEmpty())
+        assertTrue(provider.parameterHints(call).isEmpty())
     }
 }
