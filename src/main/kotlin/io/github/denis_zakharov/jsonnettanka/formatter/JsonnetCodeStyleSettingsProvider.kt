@@ -12,6 +12,8 @@ import io.github.denis_zakharov.jsonnettanka.lang.JsonnetLanguage
 class JsonnetCodeStyleSettingsProvider : CodeStyleSettingsProvider() {
     override fun createCustomSettings(settings: CodeStyleSettings): CustomCodeStyleSettings = JsonnetCodeStyleSettings(settings)
 
+    override fun getLanguage() = JsonnetLanguage
+
     override fun getConfigurableDisplayName(): String = "Jsonnet"
 
     override fun createConfigurable(settings: CodeStyleSettings, modelSettings: CodeStyleSettings): CodeStyleConfigurable =
