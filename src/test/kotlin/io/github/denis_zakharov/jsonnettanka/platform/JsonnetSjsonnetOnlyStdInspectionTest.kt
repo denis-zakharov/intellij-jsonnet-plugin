@@ -12,7 +12,7 @@ class JsonnetSjsonnetOnlyStdInspectionTest : BasePlatformTestCase() {
         myFixture.configureFromExistingVirtualFile(myFixture.addFileToProject(path, text).virtualFile)
         return myFixture.doHighlighting()
             .filter { it.description?.contains("exists only in sjsonnet") == true }
-            .map { (it.text ?: "") to it.severity.name }
+            .map { (it.text) to it.severity.name }
     }
 
     fun `test each sjsonnet-only function is flagged on its name as a warning`() {

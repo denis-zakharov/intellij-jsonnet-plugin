@@ -42,7 +42,7 @@ ecosystem at all — see the plan doc).
   versions fail against this Gradle version's `JvmVendorSpec` API). This is a
   toolchain *version number*, not a path, so it stays portable — but it does
   mean the daemon no longer just inherits whatever JVM is on `PATH`. This
-  exists because the Kotlin Gradle Plugin here (2.0.21, pre-dates JDK 25) forks
+  exists because the Kotlin Gradle Plugin at the time (2.0.21, pre-dates JDK 25; now 2.3.x) forks
   its Compile Daemon from the Gradle daemon's own JVM, and its vendored
   `JavaVersion` parser throws on any JDK-25-family version string — see
   AGENTS.md's Testing section for the full symptom/diagnosis if this
@@ -424,7 +424,7 @@ ecosystem at all — see the plan doc).
 - Built against IntelliJ IDEA Community **2025.1** (`platformVersion=2025.1`, `pluginSinceBuild=251`).
   From 2025.1 the JSON plugin's classes (`com.jetbrains.jsonSchema`) are no longer on the plain
   platform classpath: `build.gradle.kts` declares `bundledPlugin("com.intellij.modules.json")`
-  (that *is* the plugin's id). Newer platforms bundle a newer Kotlin stdlib/metadata than KGP 2.0.21
+  (that *is* the plugin's id). Newer platforms bundle a newer Kotlin stdlib/metadata than KGP 2.0.21 (now 2.3.21)
   can read (it tolerates one minor ahead, i.e. 2.1) — expect to bump Kotlin when moving to 2025.2+.
 
 ## Import graph / marketplace notes (ADRs 0006, 0007)
@@ -594,7 +594,7 @@ throws a confusing error deep inside an unrelated construct).
   Compile Daemon is forked from whatever JVM launched the **Gradle daemon**
   (not from the per-module toolchain JDK — that only controls `-jdk-home`,
   i.e. the *target* JDK for compiled output, not which JVM actually *runs*
-  the daemon process), and this repo's Kotlin Gradle Plugin version (2.0.21,
+  the daemon process), and this repo's Kotlin Gradle Plugin version (then 2.0.21,
   from before JDK 25 existed) can't parse a JDK-25-family version string at
   all — it throws regardless of the exact patch number. Since AGENTS.md's
   build-system section deliberately allows the Gradle daemon to run on

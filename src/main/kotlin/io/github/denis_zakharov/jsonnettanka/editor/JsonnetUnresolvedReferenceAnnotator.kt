@@ -42,7 +42,7 @@ class JsonnetUnresolvedReferenceAnnotator : Annotator {
 
         if (!ownResolveFailed && !flaggedBySjsonnetOnly) return
 
-        val message = if (flaggedBySjsonnetOnly) sjsonnetDivergence!!.message else "Unresolved reference: '${element.text}'"
+        val message = if (flaggedBySjsonnetOnly) sjsonnetDivergence.message else "Unresolved reference: '${element.text}'"
         holder.newAnnotation(HighlightSeverity.ERROR, message)
             .range(element.textRange)
             .create()

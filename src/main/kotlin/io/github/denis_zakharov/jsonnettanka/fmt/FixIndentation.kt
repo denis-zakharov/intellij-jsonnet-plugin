@@ -478,27 +478,27 @@ internal class FixIndentation(private val options: Options) {
                 var newIndent: Indent? = null
                 expr.beginIndex?.let {
                     newIndent = deriveIndent(openFodder(it), currIndent, column)
-                    visit(it, newIndent!!, false)
+                    visit(it, newIndent, false)
                 }
                 expr.endIndex?.let {
                     newIndent = deriveIndent(expr.endColonFodder, currIndent, column)
-                    fill(expr.endColonFodder, false, false, newIndent!!.lineUp)
+                    fill(expr.endColonFodder, false, false, newIndent.lineUp)
                     column++ // ":"
-                    visit(it, newIndent!!, false)
+                    visit(it, newIndent, false)
                 }
                 expr.step?.let {
                     if (expr.endIndex == null) {
                         newIndent = deriveIndent(expr.endColonFodder, currIndent, column)
-                        fill(expr.endColonFodder, false, false, newIndent!!.lineUp)
+                        fill(expr.endColonFodder, false, false, newIndent.lineUp)
                         column++ // ":"
                     }
                     fill(expr.stepColonFodder, false, false, newIndent!!.lineUp)
                     column++ // ":"
-                    visit(it, newIndent!!, false)
+                    visit(it, newIndent, false)
                 }
                 if (expr.beginIndex == null && expr.endIndex == null && expr.step == null) {
                     newIndent = deriveIndent(expr.endColonFodder, currIndent, column)
-                    fill(expr.endColonFodder, false, false, newIndent!!.lineUp)
+                    fill(expr.endColonFodder, false, false, newIndent.lineUp)
                     column++ // ":"
                 }
                 column++ // "]"

@@ -38,7 +38,7 @@ abstract class JsonnetFieldMixin : StubBasedPsiElementBase<JsonnetFieldStub>, Js
 
     override fun getPresentation(): ItemPresentation = object : ItemPresentation {
         override fun getPresentableText(): String? = name
-        override fun getLocationString(): String? = containingFile?.name
+        override fun getLocationString(): String? = containingFile.name
         override fun getIcon(unused: Boolean) = JsonnetIcons.FILE
     }
 }

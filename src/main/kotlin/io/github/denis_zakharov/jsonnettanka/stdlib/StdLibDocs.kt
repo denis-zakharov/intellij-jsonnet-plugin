@@ -41,7 +41,7 @@ object StdLibDocs {
             if (line.startsWith("== ")) {
                 flush()
                 header = line.removePrefix("== ").split(" | ").map { it.trim() }
-                require(header!!.size == 3) { "malformed stdlib docs header: $line" }
+                require(header.size == 3) { "malformed stdlib docs header: $line" }
             } else if (header != null) {
                 body.append(line).append('\n')
             }

@@ -121,7 +121,7 @@ class SjsonnetTracingHookTest {
         var pausedScope: List<Val?> = emptyList()
         val interpreter = TracingInterpreter(main, MemImporter(listOf(lib))) { e, scope ->
             if (fileOf(e) == "lib.libsonnet" && e is Expr.BinaryOp && pausedScope.isEmpty()) {
-                pausedScope = scope.map { it?.value() }
+                pausedScope = scope.map { (it as Eval?)?.value() }
                 paused.countDown()
                 assertTrue(resume.await(10, TimeUnit.SECONDS))
             }
