@@ -48,7 +48,7 @@ jobs:
     permissions:
       contents: write   # create the tag and the GitHub release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Work out the version and tag
         run: |
@@ -87,12 +87,12 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Build plugin zip
         run: ./gradlew buildPlugin --console=plain
@@ -120,16 +120,16 @@ jobs:
     timeout-minutes: 30
     environment: marketplace
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # publishPlugin depends on signPlugin (skipped only if the signing secrets are absent) and buildPlugin.
       - name: Sign and publish to JetBrains Marketplace

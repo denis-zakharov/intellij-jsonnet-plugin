@@ -19,22 +19,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
 
       # Caches ~/.gradle (dependencies, the downloaded IDE platform); read-only on branches other than main.
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # `test` includes StdLibRegistrySanityTest and the platform integration tests (headless, no display needed).
       - name: Build, test and check plugin structure
         run: ./gradlew buildPlugin test verifyPluginStructure verifyPluginProjectConfiguration --console=plain
 
       - name: Upload plugin zip
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: plugin-zip
           path: build/distributions/*.zip
@@ -42,7 +42,7 @@ jobs:
 
       - name: Upload test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports
           path: build/reports/tests/
