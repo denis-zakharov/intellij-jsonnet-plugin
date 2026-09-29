@@ -12,10 +12,12 @@ Features deliberately not planned are in [ADR 0015](docs/adr/0015-rejected-scope
 
 ## Publish to JetBrains Marketplace
 
-Steps and rationale: [`docs/publishing.md`](docs/publishing.md). In order:
+Not doing this yet: releases go to GitHub only. `release.yml` already has a `marketplace` job behind the repository variable
+`PUBLISH_TO_MARKETPLACE` (unset = skipped). Do these, then set the variable to `true`. Steps and rationale:
+[`docs/publishing.md`](docs/publishing.md). In order:
 
 1. [ ] Create the GitHub repository and push; add `<vendor url="…">` to `plugin.xml`; enable Actions.
-2. [ ] Let CI run once and get both jobs green, especially `plugin-verifier` (never run; may need disk/time tuning, IDE download caching).
+2. [ ] Let CI run once and get it green, then run **Extra CI** from the Actions tab and get `plugin-verifier` green (never run; may need disk/time tuning, IDE download caching).
 3. [ ] `./gradlew verifyPlugin` across the recommended IDEs (GoLand, IU, …). README says compatibility is plausible, not verified.
 4. [ ] Screenshots (Preview, Imports, Color Scheme page), which needs the `runIde` check above.
 5. [ ] Create the plugin on the Marketplace by hand, once: upload `./gradlew buildPlugin`'s zip (`0.1.0`), choose vendor/organization, MIT
@@ -25,8 +27,9 @@ Steps and rationale: [`docs/publishing.md`](docs/publishing.md). In order:
 8. [ ] Create the GitHub environment `marketplace` with required reviewers and secrets `PUBLISH_TOKEN`, `CERTIFICATE_CHAIN`, `PRIVATE_KEY`,
    `PRIVATE_KEY_PASSWORD`.
 9. [ ] Wait for JetBrains' review of the first upload before it is public.
-10. [ ] First tagged release is the next version, not `v0.1.0` (already uploaded by hand): bump `pluginVersion`, add a `CHANGELOG.md` section
-    and `<change-notes>`, tag `vX.Y.Z`, approve the `marketplace` run. If `fmt/` changed, run the jsonnetfmt differential first.
+10. [ ] Release: bump `pluginVersion`, add a `CHANGELOG.md` section and `<change-notes>`, push, then run the **Release** workflow
+    (a dry run first). If `fmt/` changed, run Extra CI's differential first. If 0.1.0 was uploaded by hand, the first flagged release
+    must be the next version.
 
 ## Small follow-ups
 

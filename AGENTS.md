@@ -356,7 +356,7 @@ ecosystem at all — see the plan doc).
   `fmt/PortedFrom.kt`, and the script refuses a binary of another version. `JsonnetFormatterDifferentialTest` (opt-in, env
   `JSONNETFMT_BIN`/`_CORPUS`/`_VARIANTS`; `cleanTest` because Gradle doesn't treat env vars as inputs) compares byte for byte, 10
   option variants. At the time of writing: 3,478 files (k8s-libsonnet 1.34, a Tanka project, grafana/tanka, go-jsonnet testdata) x
-  10 variants, 0 mismatches — including the 10,000-deep array file. Opt-in CI: `.github/workflows/jsonnetfmt-differential.yml`
+  10 variants, 0 mismatches — including the 10,000-deep array file. Opt-in CI: `.github/workflows/extra-ci.yml (`differential` job)`
   (manual + weekly; also a release-checklist step in `docs/publishing.md`). Rerun after touching `fmt/` or bumping go-jsonnet.
   `JsonnetFormatterGoldenTest` is the always-on version: upstream goldens (34 + 1 error golden) and four hand-written cases whose
   goldens are `jsonnetfmt`'s own output (`src/test/resources/fmt/{upstream,oracle}`; `goldens --write` regenerates the latter).

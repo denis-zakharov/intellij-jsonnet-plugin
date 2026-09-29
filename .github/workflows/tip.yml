@@ -1,0 +1,66 @@
+name: Tip
+
+# Keeps one rolling pre-release, `tip`, pointing at the latest `main` that passed CI, with a dev-versioned plugin zip
+# attached (0.1.0-dev.<shortsha>): for trying the newest build via Install Plugin from Disk. Never goes to the Marketplace.
+#
+# It runs after CI finishes on a push to `main` (workflow_run), so it does not run the tests twice and never publishes a
+# red commit. Run it by hand from the Actions tab to build the current head of the selected branch without waiting for CI.
+# The `tip` tag and release are deleted and recreated each time (tags created with GITHUB_TOKEN start no other workflow).
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer run waits for the running one instead of cancelling it half way through replacing the release.
+concurrency:
+  group: tip
+  cancel-in-progress: false
+
+jobs:
+  tip:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write   # delete and recreate the `tip` tag and release
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+
+      - name: Dev version
+        run: |
+          base=$(sed -n 's/^pluginVersion=//p' gradle.properties)
+          echo "DEV_VERSION=${base%%-*}-dev.${SHA::7}" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # -P overrides gradle.properties, so the version in plugin.xml, the zip name and the channel all carry the suffix.
+      - name: Build plugin zip
+        run: ./gradlew buildPlugin -PpluginVersion="$DEV_VERSION" --console=plain
+
+      - name: Replace the tip release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          subject=$(git log -1 --format=%s "$SHA")
+          gh release delete tip --yes --cleanup-tag 2>/dev/null || true
+          gh release create tip build/distributions/*.zip \
+            --prerelease --target "$SHA" \
+            --title "Tip ($DEV_VERSION)" \
+            --notes "Rolling build of \`main\` at $SHA: $subject. Not a stable release; it is replaced on every push to main."

@@ -1,9 +1,19 @@
 name: Release
 
-# Publishes to JetBrains Marketplace when a `vX.Y.Z` (or `vX.Y.Z-beta.N`) tag is pushed.
-# The tag must match `pluginVersion` in gradle.properties; the checks below fail the run otherwise.
-# Secrets live in the `marketplace` environment (Settings > Environments), which is also the
-# place to require a manual approval before this workflow can touch them:
+# Releases the version in `pluginVersion` (gradle.properties): runs CI, then creates a GitHub release with the plugin zip.
+#
+# Normal path: Actions > Release > Run workflow, on `main`. Every check runs BEFORE anything is created, and only if they
+# all pass does the run create the `vX.Y.Z` tag (at the commit it checked) and the release, so a failed run leaves no stray
+# tag. Tick `dry_run` to run all the checks and build the zip without creating anything.
+# Fallback: pushing a `vX.Y.Z` tag by hand runs the same checks (the tag must equal v + pluginVersion). Tags created by
+# this workflow don't trigger a second run (events from GITHUB_TOKEN never start workflows).
+#
+# Checks: on `main`; tag not already used; CHANGELOG.md has a `## [X.Y.Z]` section; ci.yml (build + tests) is green.
+#
+# Marketplace publishing is behind a feature flag and OFF by default. To turn it on, set the repository
+# variable PUBLISH_TO_MARKETPLACE=true (Settings > Secrets and variables > Actions > Variables). The
+# `marketplace` job then signs and uploads after the GitHub release exists. Its secrets live in the
+# `marketplace` environment (Settings > Environments), which is also where to require a manual approval:
 #   PUBLISH_TOKEN           Marketplace token (https://plugins.jetbrains.com/author/me/tokens)
 #   CERTIFICATE_CHAIN       contents of chain.crt
 #   PRIVATE_KEY             contents of private.pem
@@ -11,34 +21,64 @@ name: Release
 # docs/publishing.md explains how to create the token and the signing material.
 
 on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Run every check and build the zip, but create no tag or release
+        type: boolean
+        default: false
   push:
     tags: ['v*']
 
 permissions:
   contents: read
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   checks:
     uses: ./.github/workflows/ci.yml
 
-  publish:
+  github-release:
     needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: marketplace
     permissions:
-      contents: write   # create the GitHub release
+      contents: write   # create the tag and the GitHub release
     steps:
       - uses: actions/checkout@v4
 
-      - name: Tag must match pluginVersion
+      - name: Work out the version and tag
         run: |
           version=$(sed -n 's/^pluginVersion=//p' gradle.properties)
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::tag $GITHUB_REF_NAME does not match pluginVersion=$version in gradle.properties"
+          echo "PLUGIN_VERSION=$version" >> "$GITHUB_ENV"
+          echo "TAG=v$version" >> "$GITHUB_ENV"
+
+      - name: Must run on main (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::run this workflow on main, not $GITHUB_REF"
             exit 1
           fi
-          echo "PLUGIN_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Tag must match pluginVersion (pushed tags)
+        if: github.event_name == 'push'
+        run: |
+          if [ "$TAG" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match pluginVersion=$PLUGIN_VERSION in gradle.properties"
+            exit 1
+          fi
+
+      - name: Tag must not exist yet (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "::error::$TAG already exists; bump pluginVersion in gradle.properties"
+            exit 1
+          fi
 
       - name: CHANGELOG must describe this version
         run: |
@@ -46,6 +86,43 @@ jobs:
             echo "::error::CHANGELOG.md has no '## [$PLUGIN_VERSION]' section"
             exit 1
           fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build plugin zip
+        run: ./gradlew buildPlugin --console=plain
+
+      - name: Create tag and GitHub release
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=""
+          case "$PLUGIN_VERSION" in *-*) flags="--prerelease" ;; esac
+          # --target creates the tag at this commit; it is ignored when the tag already exists (pushed-tag run).
+          gh release create "$TAG" build/distributions/*.zip --title "$TAG" --target "$GITHUB_SHA" --generate-notes $flags
+
+      - name: Dry run summary
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          echo "Dry run OK, would release $TAG from $GITHUB_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # Feature-flagged: skipped unless the repository variable PUBLISH_TO_MARKETPLACE is 'true' (and not a dry run).
+  marketplace:
+    needs: github-release
+    if: vars.PUBLISH_TO_MARKETPLACE == 'true' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: marketplace
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
 
       - uses: actions/setup-java@v4
         with:
@@ -62,13 +139,3 @@ jobs:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
         run: ./gradlew publishPlugin --console=plain
-
-      - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Prefer the signed archive (what was uploaded to the Marketplace) if signing ran.
-          zip=$( (ls build/distributions/*-signed.zip 2>/dev/null || ls build/distributions/*.zip) | head -n 1)
-          flags=""
-          case "$PLUGIN_VERSION" in *-*) flags="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" "$zip" --title "$GITHUB_REF_NAME" --generate-notes $flags

@@ -14,7 +14,7 @@ for default options). Original plan: [`../formatter-plan.md`](../formatter-plan.
 - **Oracle-driven.** The real binary is the spec: `scripts/jsonnetfmt-conformance.py` (`version`, `goldens [--write]`, `fetch`,
   `differential`), ported release pinned in `fmt/PortedFrom.kt`, opt-in `JsonnetFormatterDifferentialTest` (10 option variants; 3,478
   files x 10 variants, 0 mismatches at the time), goldens (34 upstream + 1 error + 4 oracle-generated), and weekly opt-in CI
-  (`.github/workflows/jsonnetfmt-differential.yml`, also a release-checklist step).
+  (`.github/workflows/extra-ci.yml (`differential` job)`, also a release-checklist step).
 - **go-jsonnet's quirks are the spec; don't fix them** (list in `AGENTS.md` "Formatter"). jsonnetfmt isn't idempotent on `(((1)))`.
 - Columns are UTF-8 byte counts; import sorting compares code points.
 - `WHITESPACE_ONLY` (`rewriteTokens = false`) is a property test since it has no oracle: same non-whitespace characters. It found three
