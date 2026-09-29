@@ -134,5 +134,8 @@ tasks {
 
     test {
         useJUnitPlatform()
+        // The test framework sets java.system.class.loader, which disables app-class CDS and
+        // makes the JVM warn about it on every run. Harmless; hide just that log tag.
+        jvmArgs("-Xlog:cds=off")
     }
 }
