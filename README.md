@@ -74,8 +74,8 @@ Use the checked-in Gradle wrapper. Gradle itself runs on JDK 21 (pinned in
 
 Two modules: the plugin, and `:shaded-sjsonnet`, which repackages sjsonnet and its Scala 3 runtime under
 `io.github.denis_zakharov.jsonnettanka.shaded.*` so it can't collide with JetBrains' bundled Scala plugin. `AGENTS.md` and
-`jsonnet-tanka-intellij-plugin-plan.md` record the design, the bugs found along the way and the testing
-constraints; `TODO.md` is the backlog.
+`docs/initial-plan.md` record the design, the bugs found along the way and the testing
+constraints; `TODO.md` is the open backlog and `docs/adr/` holds the decision records.
 
 ## Licenses
 

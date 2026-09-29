@@ -23,7 +23,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
  * `CodeStyleManager.reformat()` invocation, the Phase 4 stub-index build/
  * query pipeline, and the Phase 5 unused-declaration inspection's quick-fix
  * wiring — now that `BasePlatformTestCase` is confirmed working in this
- * environment (see TODO.md item 1 and the `JsonnetFileType` fix that made it
+ * environment (see ADR 0001 and the `JsonnetFileType` fix that made it
  * so: a real plugin bug — `LibsonnetFileType.getName()` not matching its
  * `plugin.xml` declaration — was corrupting stub-index initialization and
  * wedging `tearDown()`'s leak-check on a future that never completed, which
@@ -155,7 +155,7 @@ class JsonnetPlatformIntegrationTest : BasePlatformTestCase() {
         assertEquals("\"Hello, World!\"", (result as JsonnetEngine.Result.Success).output)
     }
 
-    // --- Unsaved editor buffers (TODO.md item 5) + Preview click-jump across files (item 4) ---
+    // --- Unsaved editor buffers (ADR 0004) + Preview click-jump across files (ADR 0004) ---
 
     private fun setUnsavedText(file: com.intellij.openapi.vfs.VirtualFile, text: String) {
         val document = FileDocumentManager.getInstance().getDocument(file)!!
@@ -200,7 +200,7 @@ class JsonnetPlatformIntegrationTest : BasePlatformTestCase() {
         assertEquals(edited.indexOf("1"), location.offset)
     }
 
-    // --- Preview panel wiring (TODO.md item 4): focus -> evaluate -> click-jump ---
+    // --- Preview panel wiring (ADR 0004): focus -> evaluate -> click-jump ---
 
     private fun previewPanelFor(fileName: String, text: String): io.github.denis_zakharov.jsonnettanka.editor.preview.JsonnetPreviewPanel {
         myFixture.configureByText(fileName, text)
@@ -296,7 +296,7 @@ class JsonnetPlatformIntegrationTest : BasePlatformTestCase() {
         assertEquals("5", panel.outputText.trim())
     }
 
-    // --- ColorSettingsPage (TODO.md item 6) ---
+    // --- ColorSettingsPage (ADR 0005) ---
 
     fun `test color settings page is registered and covers every semantic highlighting key`() {
         val pages = com.intellij.openapi.options.colors.ColorSettingsPages.getInstance().registeredPages
@@ -322,7 +322,7 @@ class JsonnetPlatformIntegrationTest : BasePlatformTestCase() {
         assertTrue("demo text should evaluate, got: $result", result is JsonnetEngine.Result.Success)
     }
 
-    // --- JsonnetUnresolvedReferenceAnnotator (Phase 2) + SjsonnetStaticCheck cross-check (TODO.md item 3) ---
+    // --- JsonnetUnresolvedReferenceAnnotator (Phase 2) + SjsonnetStaticCheck cross-check (ADR 0003) ---
 
     private fun errorRanges(): List<com.intellij.openapi.util.TextRange> =
         myFixture.doHighlighting()

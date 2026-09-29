@@ -28,7 +28,7 @@ import io.github.denis_zakharov.jsonnettanka.lang.psi.JsonnetTypes.*
  *    operand (`alignStrong`/`align` in the port);
  *  - a value that starts on a new line (`a:⏎value`, `local x =⏎value`, `if c then⏎value`) is one level in.
  *
- * Deliberate deviations, all in rare shapes (see TODO.md item 15): the "strong indent" the port switches to when a later
+ * Deliberate deviations, all in rare shapes (see ADR 0013): the "strong indent" the port switches to when a later
  * call argument/array element starts a line, and hanging field values on the second and later fields of a `{ a: 1,`
  * object. `JsonnetTypingConsistencyTest` measures the agreement against real `jsonnetfmt` output.
  */

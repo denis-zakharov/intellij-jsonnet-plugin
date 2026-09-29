@@ -1,9 +1,9 @@
 > **Historical document.** This is the initial plan for the formatter work, kept as written when it was approved
 > (2026-09-21). It is not maintained. What actually shipped, the gotchas found on the way and the current state are in
-> `AGENTS.md` ("Formatter") and `TODO.md` (items 14–22).
+> `AGENTS.md` ("Formatter") and ADRs 0012–0014 (`docs/adr/`).
 >
 > Where the implementation departed from this plan:
-> - Phases 1–3 and 5 were done; phase 4 (Block-model rewrite, typing-time indentation) is done too — see `TODO.md` item 15 for the measured agreement and the residual shapes.
+> - Phases 1–3 and 5 were done; phase 4 (Block-model rewrite, typing-time indentation) is done too — see ADR 0013 for the measured agreement and the residual shapes.
 > - `Options` gained `rewriteTokens` (needed for a real whitespace-only mode); `WHITESPACE_ONLY` is not just "styles = leave".
 > - The service maps carets by hand (`JsonnetTextEdits.mapOffset`); the platform's default left them in front of inserted whitespace.
 > - `format()` converts `StackOverflowError` (10,000 nested arrays) into a `ParseError`; not anticipated here.
@@ -135,7 +135,7 @@ Rejected: deriving B's indents by running A on the file being edited (fails on s
    text blocks, DOS line endings, comments) into `src/test/resources/fmt/`. Plus idempotence: `fmt(fmt(x)) == fmt(x)`.
 2. **Differential test against the real binary** (`jsonnetfmt` v0.22.0 is installed at `~/go/bin/jsonnetfmt`): opt-in
    test/Gradle property that runs every `.jsonnet/.libsonnet` in a corpus dir through both and compares. Corpora available now:
-   go-jsonnet checkout (1,112 files), a sparse `k8s-libsonnet` clone (688 files, recipe in TODO.md item 2), and the user's own Tanka
+   go-jsonnet checkout (1,112 files), a sparse `k8s-libsonnet` clone (688 files, recipe in ADR 0002), and the user's own Tanka
    projects. Add `scripts/jsonnetfmt-conformance.py` (modelled on `scripts/sjsonnet-conformance.py`) to rerun after go-jsonnet bumps and
    to generate any extra checked-in goldens. Expect the first run to surface the non-ASCII/byte-length and sort-order issues above.
 3. **Parse-error parity**: inputs go-jsonnet rejects must be rejected (no partial output).
@@ -168,7 +168,7 @@ Phases 1–3 deliver "Reformat Code == tk fmt" on their own and are shippable be
 - Modified: `formatter/JsonnetBlock.kt`, `formatter/JsonnetFormattingModelBuilder.kt`, `editor/JsonnetBraceMatcher.kt`,
   `src/main/resources/META-INF/plugin.xml` (`formattingService`, `langCodeStyleSettingsProvider`, `codeStyleSettingsProvider`),
   `platform/JsonnetPlatformIntegrationTest.kt`, `THIRD_PARTY_NOTICES.md`.
-- Reuse: notification group `Jsonnet`; `scripts/sjsonnet-conformance.py` as the script template; the k8s-libsonnet sparse-clone recipe (TODO.md item 2).
+- Reuse: notification group `Jsonnet`; `scripts/sjsonnet-conformance.py` as the script template; the k8s-libsonnet sparse-clone recipe (ADR 0002).
 
 ## Risks / open items
 

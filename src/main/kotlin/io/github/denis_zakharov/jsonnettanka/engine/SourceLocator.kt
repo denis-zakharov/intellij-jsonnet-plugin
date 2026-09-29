@@ -15,7 +15,7 @@ sealed class PathSegment {
 data class SourceLocation(val path: Path, val offset: Int)
 
 /**
- * Preview's output→source click-jump (TODO.md item 4): given the path to a value in the rendered
+ * Preview's output→source click-jump (ADR 0004): given the path to a value in the rendered
  * output (`spec.containers[0].name`), finds the source position that *produced* that value, using
  * sjsonnet's own evaluation rather than a PSI approximation — so it follows `local`s, `+`
  * composition, `super`, function calls and imports, and can land in a different file than the one

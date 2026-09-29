@@ -1,9 +1,9 @@
 # AGENTS.md
 
-Notes for picking this project back up in a fresh session. The full phased
-plan and its per-phase status/decisions live in
-`jsonnet-tanka-intellij-plugin-plan.md` — **read that file's checklists and
-"Status" blocks first**, they're the primary record. This file exists for
+Notes for picking this project back up in a fresh session. Decisions and what
+shipped are recorded as ADRs in `docs/adr/` (index: `docs/adr/README.md`); open
+work is in `TODO.md`; the original phased plan is `docs/initial-plan.md`
+(historical, not maintained). This file exists for
 things a fresh session would otherwise have to rediscover the hard way:
 build-system gotchas, real bugs hit and fixed, and testing constraints
 specific to *this* sandbox environment.
@@ -156,7 +156,7 @@ ecosystem at all — see the plan doc).
   `offset()`, on the evaluating thread, with the live scope array. `SjsonnetTracingHookTest` is the working
   example and the guard. Two things bit while probing: `Interpreter`'s default logger is `null`, so the
   parameter must be nullable in Kotlin; and some expressions have `offset() == -1`. Not every expression
-  goes through it (eager arithmetic fast paths and constant folding skip it) — details in TODO.md item 13.
+  goes through it (eager arithmetic fast paths and constant folding skip it) — details in ADR 0011.
   Nothing in the plugin uses the hook yet.
 - **`std`'s own functions are hidden fields.** `Val$Obj.visibleKeyNames()`
   returns *empty* for the default std object — std's own 170-ish functions
@@ -182,7 +182,7 @@ ecosystem at all — see the plan doc).
   static methods (`` Interpreter.`$lessinit$greater$default$N`() ``). Copy
   this pattern rather than re-deriving it.
 - **Unresolved-variable detection happens in `CachedResolver.parse()`, not in
-  a later `StaticOptimizer.optimize()` call** — TODO.md item 3's spike
+  a later `StaticOptimizer.optimize()` call** — ADR 0003's spike
   (`SjsonnetStaticCheck.kt`) confirmed this the hard way: `StaticOptimizer`'s
   class file does contain the string `"Unknown variable: \u0001"` (found via
   `javap -v` grepping the constant pool for `variable`), which is what
@@ -229,7 +229,7 @@ ecosystem at all — see the plan doc).
   file, too expensive to redo per identifier) layered on top only to catch
   cases the hand-rolled walk's own logic might miss.
 
-## Evaluation / Preview gotchas (TODO.md items 4–5)
+## Evaluation / Preview gotchas (ADR 0004)
 
 - **`Interpreter`'s Map-based constructor makes every ext/TLA var `ext-code`**
   (`ExternalVariable.code`, seen in bytecode). A plain string must be passed as
@@ -374,7 +374,7 @@ ecosystem at all — see the plan doc).
   `unicode_*` oracle cases. Non-ASCII *identifiers* are invalid Jsonnet (jsonnetfmt rejects them too).
 - The JVM stack is not Go's: the recursive passes overflow the caller's stack at a few hundred nested levels (~200 of `{a:`),
   so `format()` retries once on a worker thread with a 512 MB stack (handles 200,000 levels) and only then turns
-  `StackOverflowError` into a `ParseError` ("nested too deeply") instead of crashing the EDT. Timings are in TODO.md item 20
+  `StackOverflowError` into a `ParseError` ("nested too deeply") instead of crashing the EDT. Timings are in ADR 0012
   (123 KB file: ~15 ms; no size guard needed). `JsonnetTextEdits` falls back to one edit if the platform diff gives up.
 - `Options.WHITESPACE_ONLY` (`rewriteTokens = false`, styles = leave, no import sorting) is for callers with
   `canChangeWhiteSpaceOnly`. The port's lexer drops digit separators (`1_000` -> `1000`), so `JsonnetFormattingService`
@@ -412,7 +412,7 @@ ecosystem at all — see the plan doc).
   - Enter between `{}` is the platform's; `[]`/`()` need `JsonnetEnterBetweenBracesDelegate` (`<enterBetweenBracesDelegate>`).
   - Spacing is `spacesBetween(parent, left, right)` in the block (the old `SpacingBuilder` matched by token only and couldn't tell
     `[a]` from `a[0]`); it keeps line breaks.
-  - Not mirrored: the port's "strong indent" and UTF-8 byte columns (see TODO.md item 15).
+  - Not mirrored: the port's "strong indent" and UTF-8 byte columns (see ADR 0013).
 - **Vendor/dot-files are skipped by Reformat Code** (`JsonnetFormatExclusions`, like `tk fmt`): the service returns without editing
   rather than declining, because declining would let the Block model format them. Setting `SKIP_VENDOR_AND_DOTFILES`.
 - Testing reformat entry points: `ActionsOnSaveManager` doesn't run from `saveAllDocuments` in a light fixture, so on-save is
@@ -427,7 +427,7 @@ ecosystem at all — see the plan doc).
   (that *is* the plugin's id). Newer platforms bundle a newer Kotlin stdlib/metadata than KGP 2.0.21
   can read (it tolerates one minor ahead, i.e. 2.1) — expect to bump Kotlin when moving to 2025.2+.
 
-## Import graph / marketplace notes (TODO.md items 7, 9)
+## Import graph / marketplace notes (ADRs 0006, 0007)
 
 - **Import resolution has one implementation: `TankaJpath.resolveImport`**, used
   by both `VirtualFileImporter` (evaluation) and `JsonnetImportGraph` (the
@@ -509,7 +509,7 @@ throws a confusing error deep inside an unrelated construct).
    not by a hand-written `ParsingTestCase` fixture but by literally running
    the parser over a real, large, external corpus — a sparse clone of
    `jsonnet-libs/k8s-libsonnet`'s `1.34/` directory (688 real files) — as
-   part of TODO.md item 2's stub-index scale validation. Every other file
+   part of ADR 0002's stub-index scale validation. Every other file
    parsed cleanly; this construct was the one real gap. Fix: add
    `objectLiteral` as a `postfixSuffix` alternative (matches the real
    spec grammar's `expr3 objinside` production) — no ambiguity with
@@ -520,7 +520,7 @@ throws a confusing error deep inside an unrelated construct).
    `JsonnetParsingTest.kt`. **Lesson: a hand-written "kitchen sink" test
    fixture, however thorough it feels, only covers constructs someone
    thought to write — running the real parser over a large real-world
-   corpus (any `jsonnet-libs` package works; see TODO.md item 2 for the
+   corpus (any `jsonnet-libs` package works; see ADR 0002 for the
    exact sparse-clone recipe: `git clone --depth 1 --filter=blob:none
    --sparse <repo> && git sparse-checkout set <one-version-dir>`) is worth
    doing again whenever the grammar changes substantially, not just once.**
@@ -571,7 +571,7 @@ throws a confusing error deep inside an unrelated construct).
      .tearDown()`'s leak-check (`waitUntilStubIndexedInitialized`) awaits with
      no timeout** — that's the actual 16-minute "hang." A `jstack` dump of the
      stuck `Test worker` thread during a repro (see git history around the
-     TODO.md item 1 fix for the exact stack) pointed straight at it. Once
+     ADR 0001 fix for the exact stack) pointed straight at it. Once
      fixed, the same test suite completes in ~3 seconds.
   2. Separately, `PsiReferenceBase.getRangeInElement()`'s default impl throws
      `PluginException: No ElementManipulator instance registered for

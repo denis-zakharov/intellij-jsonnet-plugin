@@ -59,7 +59,7 @@ class ImportNode(
 )
 
 /**
- * TODO.md item 7: the lightweight import-graph view's model — deliberately not the
+ * ADR 0006: the lightweight import-graph view's model — deliberately not the
  * `com.intellij.diagram` `DiagramProvider` framework. Resolution goes through
  * [TankaJpath.resolveImport], the same rule evaluation uses, so the graph can't disagree with what
  * `import` will actually load.

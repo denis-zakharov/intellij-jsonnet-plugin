@@ -29,7 +29,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * TODO.md item 13: the "sjsonnet has no evaluation-tracing hook" premise (behind not building a debugger) was
+ * ADR 0011: the "sjsonnet has no evaluation-tracing hook" premise (behind not building a debugger) was
  * wrong. `Interpreter.createEvaluator` and `Evaluator.visitExpr` are public and non-final, so a subclass sees
  * every expression the evaluator dispatches, with its file and offset, on the thread that evaluates it —
  * enough to block there (a breakpoint) and read the scope. No reflection needed.
@@ -132,7 +132,7 @@ class SjsonnetTracingHookTest {
 
         assertTrue(paused.await(10, TimeUnit.SECONDS), "never reached the breakpoint")
         assertTrue(worker.state in setOf(Thread.State.WAITING, Thread.State.TIMED_WAITING), "the evaluating thread should be parked inside the hook, was ${worker.state}")
-        // `l.double(21)`: the argument is visible in the scope as a value (slots have no names — see TODO.md 13)
+        // `l.double(21)`: the argument is visible in the scope as a value (slots have no names — see ADR 0011)
         assertTrue(pausedScope.any { it is Val.Num && it.rawDouble() == 21.0 }, pausedScope.toString())
 
         resume.countDown()

@@ -110,7 +110,7 @@ private postfixExpr ::= atom postfixSuffix*
 // real Jsonnet spec grammar treats `expr { ... }` as sugar for
 // `expr + { ... }` ("object mixin juxtaposition") — extremely common in
 // real Tanka/k8s-libsonnet code (e.g. `deployment.new() { spec+: {...} }`).
-// Found missing entirely by TODO.md item 2's real-world-corpus scale test
+// Found missing entirely by ADR 0002's real-world-corpus scale test
 // against jsonnet-libs/k8s-libsonnet — every other construct in that ~690
 // file, 7MB tree parsed fine; this was the one genuine gap.
 private postfixSuffix ::= dotSuffix | indexSuffix | callSuffix | objectLiteral

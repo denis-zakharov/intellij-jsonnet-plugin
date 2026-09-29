@@ -12,7 +12,7 @@ import io.github.denis_zakharov.jsonnettanka.shaded.sjsonnet.ParseError
 import io.github.denis_zakharov.jsonnettanka.shaded.sjsonnet.StaticResolvedFile
 
 /**
- * TODO.md item 3: cross-checks [io.github.denis_zakharov.jsonnettanka.editor.JsonnetUnresolvedReferenceAnnotator]'s
+ * ADR 0003: cross-checks [io.github.denis_zakharov.jsonnettanka.editor.JsonnetUnresolvedReferenceAnnotator]'s
  * own hand-rolled [io.github.denis_zakharov.jsonnettanka.lang.psi.reference.JsonnetResolver] lexical-scope walk
  * against sjsonnet's actual scope resolution — the same static analysis real Jsonnet runs before
  * every evaluation — so a divergence (our resolver missing something real Jsonnet would reject)

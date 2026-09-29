@@ -89,7 +89,7 @@ class JsonnetParsingTest : ParsingTestCase("", "jsonnet", JsonnetParserDefinitio
     // juxtaposed after any expression, no operator) is sugar for
     // `expr + { ... }` — idiomatic and extremely common in real Tanka/
     // k8s-libsonnet code (e.g. `deployment.new() { spec+: {...} } `). Missing
-    // entirely until a TODO.md item-2 scale test against a real
+    // entirely until the ADR 0002 scale test against a real
     // jsonnet-libs/k8s-libsonnet checkout (~690 files) found exactly one
     // parse failure, on exactly this construct.
     fun `test object literal juxtaposed after a call is a mixin apply`() {

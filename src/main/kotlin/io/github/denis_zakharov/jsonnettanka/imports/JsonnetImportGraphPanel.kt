@@ -40,7 +40,7 @@ import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 
 /**
- * TODO.md item 7: read-only import-graph view for whichever Jsonnet file is focused — a tree of
+ * ADR 0006: read-only import-graph view for whichever Jsonnet file is focused — a tree of
  * everything it imports (transitively) or, with the "Imported By" toggle, everything that imports
  * it. Double-click / Enter opens the file (or, for an unresolved import, the import expression
  * itself). The model is [JsonnetImportGraph]; this is only the shell around it.

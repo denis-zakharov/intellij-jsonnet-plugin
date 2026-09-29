@@ -21,7 +21,7 @@ import com.intellij.psi.util.PsiModificationTracker
  * sjsonnet name-resolution pass sjsonnet itself runs before every evaluation. If
  * sjsonnet finds an unresolved name our own resolver missed (a false negative —
  * exactly the "hand-rolled resolver can silently diverge from real Jsonnet scoping
- * rules" trust gap TODO.md's item 3 was about), that identifier gets flagged too,
+ * rules" trust gap ADR 0003 was about), that identifier gets flagged too,
  * even though our own quick check thought it was fine. See [SjsonnetStaticCheck]'s
  * doc for why this is additive rather than a full replacement: the real optimizer's
  * unresolved-name check is fail-fast (one divergence per file per pass), so it can't

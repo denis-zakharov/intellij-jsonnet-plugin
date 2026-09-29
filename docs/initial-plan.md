@@ -1,3 +1,9 @@
+> **Historical document.** This is the initial plan for the whole plugin, kept as written (per-phase status blocks
+> included). It is not maintained. Decisions and what actually shipped are recorded as ADRs in [`adr/`](adr/README.md);
+> gotchas for picking the project back up are in `AGENTS.md`; open work is in `TODO.md`.
+
+---
+
 # A Native (Non-LSP) IntelliJ Plugin for Jsonnet + Tanka
 ### Research summary and phased build plan for Claude Code
 
@@ -376,7 +382,7 @@ a tracked checklist.
   (`JsonnetLocalReference.isSoft`) so it's never flagged. Preview
   originally supported ext vars only and read imports off disk; TLA vars, a YAML
   toggle, output→source click-jump, and unsaved-buffer reads were added later
-  (TODO.md items 4–5).
+  (ADR 0004).
   Testing note: a `BasePlatformTestCase`-based test for the new VFS importer
   was attempted but the IDE-sandbox test process hung indefinitely (16+
   minutes, no output, had to be killed) in this environment — abandoned
@@ -602,7 +608,7 @@ a tracked checklist.
     argues against. A real debugger integration (`XDebuggerManager`, a
     breakpoint type, a suspend/step protocol against an interpreter that
     supports none of that) is a phase of its own, not a Phase 5 line item.
-    **Correction (TODO.md item 13):** the "no hook" finding above was wrong —
+    **Correction (ADR 0011):** the "no hook" finding above was wrong —
     `Interpreter.createEvaluator` and `Evaluator.visitExpr` are public and
     non-final, so a plain subclass sees every dispatched expression (file,
     offset, live scope) on the evaluating thread, without reflection. Probed and
