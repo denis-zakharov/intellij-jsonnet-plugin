@@ -13,3 +13,4 @@ bin/
 # Plugin signing material (see docs/publishing.md)
 *.pem
 chain.crt
+logs/

@@ -12,7 +12,8 @@ import io.github.denis_zakharov.jsonnettanka.lang.psi.reference.JsonnetResolver
 import com.intellij.ide.structureView.StructureViewTreeElement
 import com.intellij.ide.util.treeView.smartTree.TreeElement
 import com.intellij.navigation.ItemPresentation
-import com.intellij.psi.NavigatablePsiElement
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
+import com.intellij.psi.PsiNameIdentifierOwner
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
@@ -26,10 +27,13 @@ class JsonnetStructureElement(private val element: PsiElement) : StructureViewTr
     override fun getValue(): Any = element
 
     override fun navigate(requestFocus: Boolean) {
-        (element as? NavigatablePsiElement)?.navigate(requestFocus)
+        val file = element.containingFile?.virtualFile ?: return
+        val target = (element as? PsiNameIdentifierOwner)?.nameIdentifier ?: element
+        // Invoking Navigatable.navigate through the PSI element is flagged @OverrideOnly; OpenFileDescriptor is the concrete type.
+        OpenFileDescriptor(element.project, file, target.textOffset).navigate(requestFocus)
     }
 
-    override fun canNavigate(): Boolean = (element as? NavigatablePsiElement)?.canNavigate() ?: false
+    override fun canNavigate(): Boolean = element.containingFile?.virtualFile != null
 
     override fun canNavigateToSource(): Boolean = canNavigate()
 
