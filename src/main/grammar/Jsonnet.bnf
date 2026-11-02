@@ -244,11 +244,12 @@ computedFieldName ::= LBRACK expr RBRACK {
 private fieldOp ::= COLONCOLONCOLON | COLONCOLON | COLON
                     | PLUSCOLONCOLONCOLON | PLUSCOLONCOLON | PLUSCOLON
 
+// `+:` is accepted too (`{ [k]+: v for k in ks }` merges into an existing `k`); hidden `::` is not, as in go-jsonnet.
 // pin=5 (after forSpec, i.e. once we've seen the mandatory `for`) not pin=2:
 // `computedFieldName COLON expr` alone is also a valid plain field, so
 // committing any earlier breaks backtracking into objectMemberList for the
 // (far more common) non-comprehension case.
-objectComprehension ::= (objectLocal COMMA)* computedFieldName COLON expr forSpec compSpec* {
+objectComprehension ::= (objectLocal COMMA)* computedFieldName (COLON | PLUSCOLON) expr forSpec compSpec* {
   pin=5
 }
 

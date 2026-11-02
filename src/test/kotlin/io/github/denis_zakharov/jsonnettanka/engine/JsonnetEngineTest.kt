@@ -27,6 +27,68 @@ class JsonnetEngineTest {
     }
 
     @Test
+    fun `evaluates the tutorial array and object comprehensions`() {
+        val out = ok(
+            JsonnetEngine.evaluate(
+                "comp.jsonnet",
+                """
+                local arr = std.range(5, 8);
+                {
+                  higher: [x + 1 for x in arr],
+                  evens_and_odds: ["%d-%d" % [x, y] for x in arr if x % 2 == 0 for y in arr if y % 2 == 1],
+                  obj: { ["foo" + x]: true for x in [1, 2] },
+                  with_local: { local y = x * 2, ["k" + x]: y for x in [1, 2] },
+                }
+                """.trimIndent(),
+            ),
+        )
+        assertTrue(out.contains("\"foo1\": true"), out)
+        assertTrue(out.contains("\"k2\": 4"), out)
+        assertTrue(out.contains("\"6-5\""), out)
+    }
+
+    @Test
+    fun `evaluates computed field names alone and with comprehensions`() {
+        val out = ok(
+            JsonnetEngine.evaluate(
+                "computed.jsonnet",
+                """
+                local k = 'a';
+                {
+                  [k + 'b']: 1,
+                  [k + 'h']:: 2,
+                  [k + 'p']+: { x: 1 },
+                  [k + 'f'](p, q=1):: p + q,
+                  [k]: 3,
+                  [if true then 'cond' else 'no']: 4,
+                  nested: { [x]: { [y]: x + y for y in ['1', '2'] } for x in ['p', 'q'] },
+                  keys_from_comp: { [std.join('', [c for c in ['u', 'v']])]: 5 },
+                  localized: { local y = x + '!', [x]: y for x in ['hi'] },
+                  usesF: self.af(1),
+                } + { ap+: { y: 2 } }
+                """.trimIndent(),
+            ),
+        )
+        listOf(
+            "\"ab\": 1", "\"a\": 3", "\"cond\": 4", "\"uv\": 5", "\"hi\": \"hi!\"",
+            "\"usesF\": 2", "\"y\": 2",
+        ).forEach { assertTrue(out.contains(it), "missing $it in\n$out") }
+        assertTrue(!out.contains("\"ah\""), "hidden computed field leaked:\n$out")
+        assertTrue(out.contains("\"p\": {") && out.contains("\"p1\"".let { "\"1\": \"p1\"" }), out)
+    }
+
+    @Test
+    fun `evaluates an object comprehension with the merge operator`() {
+        val out = ok(
+            JsonnetEngine.evaluate(
+                "merge.jsonnet",
+                "{ a: { x: 1 } } + { [key]+: { f1: 'v1' } for key in ['a', 'b'] }",
+            ),
+        )
+        assertTrue(out.contains("\"x\": 1") && out.contains("\"f1\": \"v1\"") && out.contains("\"b\""), out)
+    }
+
+    @Test
     fun `reports parse errors instead of throwing`() {
         val result = JsonnetEngine.evaluate("bad.jsonnet", "{ a: ")
         assertTrue(result is JsonnetEngine.Result.Failure)

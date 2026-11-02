@@ -139,6 +139,18 @@ class JsonnetPlatformIntegrationTest : BasePlatformTestCase() {
         assertEquals(0, binds.size)
     }
 
+    fun `test stub index tolerates computed field names and comprehensions`() {
+        myFixture.configureByText(
+            "lib.jsonnet",
+            "{ [k]: 1, plain: 2, comp: { [x]: x for x in ['a'] }, arr: [y for y in [1]] }",
+        )
+        val scope = GlobalSearchScope.allScope(project)
+        assertEquals(1, StubIndex.getElements(JsonnetFieldIndex.KEY, "plain", project, scope, JsonnetField::class.java).size)
+        assertEquals(1, StubIndex.getElements(JsonnetFieldIndex.KEY, "comp", project, scope, JsonnetField::class.java).size)
+        // loop variables and computed keys are not top-level declarations
+        assertEquals(0, StubIndex.getElements(JsonnetBindIndex.KEY, "x", project, scope, JsonnetBind::class.java).size)
+    }
+
     // --- VirtualFileImporter / VirtualFilePath (Phase 2), against the real IDE VFS ---
 
     fun `test import resolves relative to the importing file via the real VFS`() {

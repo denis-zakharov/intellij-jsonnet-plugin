@@ -17,6 +17,18 @@ class SjsonnetStaticCheckTest {
     }
 
     @Test
+    fun `comprehension variables and computed keys resolve`() {
+        val source = "local a = ['p']; { [x + 'k']: [y for y in a] + [x] for x in a if x != 'q' }"
+        assertNull(SjsonnetStaticCheck.firstUnresolvedVariable("test.jsonnet", source))
+    }
+
+    @Test
+    fun `comprehension variable does not leak out of its comprehension`() {
+        val source = "[x for x in [1]] + [x]"
+        requireNotNull(SjsonnetStaticCheck.firstUnresolvedVariable("test.jsonnet", source))
+    }
+
+    @Test
     fun `bare unresolved identifier is reported at its own offset`() {
         val source = "local x = 1; x + totallyUndefined"
         val result = SjsonnetStaticCheck.firstUnresolvedVariable("test.jsonnet", source)
